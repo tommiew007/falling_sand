@@ -7,6 +7,11 @@ Currently there is no mass model. Density differences are faked via hardcoded mo
 
 ---
 
+**Density lookup table**
+No material has a numeric density value. Displacement rules are hardcoded per-material as explicit lists of what each cell can push through — a hand-written approximation that breaks silently when new materials are added and requires auditing a dozen places for every change. The fix is a single `DENSITY[]` array (one value per material ID) and a `canDisplace(a, b)` helper that replaces all hardcoded displacement lists with a `density[a] > density[b]` check. Moderate refactor — touches every material's movement block — but eliminates an entire class of bugs and makes future materials trivial to place correctly in the ordering. Also enables naturally correct buoyancy for any new material without manual list updates.
+
+---
+
 **Thermal diffusion**
 Each cell carries its own temperature rather than reacting to a single global ambient. Heat radiates outward from fire and lava, cold propagates from ice, and phase transitions respond to local conditions instead of the world thermostat. Key design questions: per-cell array type (Uint16 vs Float32), diffusion frequency (every frame vs alternating), and whether air cells participate or simply reset to ambient each tick. Benchmark before committing — memory bandwidth is the primary risk to frame rate.
 
