@@ -93,9 +93,10 @@ function pressureAbove(x, y) {
 }
 
 // ─── Ambient temperature ──────────────────────────────────────────────────────
-// Stored internally in Fahrenheit. Range 0–10,000°F.
+// Stored internally in Fahrenheit. Slider range 0–5,000°F; Inferno button → 10,000°F.
 let ambientF   = 70;
 let useCelsius = false;
+let infernoOn  = false;
 
 // Piecewise linear curve: [sliderPct (0–100), tempF]
 // Key thresholds each get proportional slider travel so precision is
@@ -106,10 +107,9 @@ const TEMP_CURVE = [
   [ 25,   212],   // boiling
   [ 35,   480],   // combustion / wood ignition
   [ 50,  1300],   // lava stays molten
-  [ 62,  2000],   // stone melts
-  [ 72,  3100],   // sand melts (silica)
-  [ 85,  6000],   // inferno
-  [100, 10000],   // plasma
+  [ 65,  2000],   // stone melts
+  [ 80,  3100],   // sand melts (silica)
+  [100,  5000],   // glass melts to lava (slider max)
 ];
 
 function sliderToTemp(pct) {
@@ -1203,7 +1203,8 @@ sliderEl.addEventListener('input', function () {
 sliderEl.addEventListener('wheel', e => {
   e.preventDefault();
   const step = e.shiftKey ? 1 : 5;
-  ambientF = Math.max(0, Math.min(10000, ambientF + (e.deltaY < 0 ? step : -step)));
+  if (infernoOn) return;
+  ambientF = Math.max(0, Math.min(5000, ambientF + (e.deltaY < 0 ? step : -step)));
   syncSlider();
   updateTempDisplay();
 }, { passive: false });
@@ -1214,7 +1215,8 @@ sliderEl.addEventListener('keydown', e => {
   e.preventDefault();
   const step  = e.shiftKey ? 10 : 1;
   const delta = e.key === 'ArrowRight' ? step : -step;
-  ambientF = Math.max(0, Math.min(10000, ambientF + delta));
+  if (infernoOn) return;
+  ambientF = Math.max(0, Math.min(5000, ambientF + delta));
   syncSlider();
   updateTempDisplay();
 });
@@ -1222,6 +1224,20 @@ sliderEl.addEventListener('keydown', e => {
 document.getElementById('btnUnit').addEventListener('click', () => {
   useCelsius = !useCelsius;
   document.getElementById('btnUnit').textContent = useCelsius ? '°F' : '°C';
+  updateTempDisplay();
+});
+
+document.getElementById('btnInferno').addEventListener('click', () => {
+  infernoOn = !infernoOn;
+  const btn = document.getElementById('btnInferno');
+  btn.classList.toggle('on', infernoOn);
+  sliderEl.disabled = infernoOn;
+  if (infernoOn) {
+    ambientF = 10000;
+  } else {
+    ambientF = 5000;
+    syncSlider();
+  }
   updateTempDisplay();
 });
 

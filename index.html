@@ -258,15 +258,14 @@
       cursor: pointer;
       outline: none;
       background: linear-gradient(to right,
-        #0055ff  0%,    /* 0 °F   */
+        #0055ff  0%,    /* 0 °F            */
         #44aaff  15%,   /* 32 °F  freeze   */
         #e0e0e0  25%,   /* 212 °F boil     */
         #ffdd00  35%,   /* 480 °F combust  */
         #ff8800  50%,   /* 1300 °F lava    */
-        #ff3300  62%,   /* 2000 °F stone   */
-        #dd0000  72%,   /* 3100 °F sand    */
-        #aa0000  85%,   /* 6000 °F inferno */
-        #ffffff  100%   /* 10000 °F plasma */
+        #ff3300  65%,   /* 2000 °F stone   */
+        #cc0000  80%,   /* 3100 °F sand    */
+        #ffffff  100%   /* 5000 °F max     */
       );
     }
 
@@ -289,6 +288,10 @@
       border: 2px solid rgba(0,0,0,0.4);
       cursor: pointer;
     }
+
+    #sTempSlider:disabled { opacity: 0.3; cursor: not-allowed; }
+    #btnInferno { background: #0d0d0d; color: #444; border-color: #222; letter-spacing: 1px; }
+    #btnInferno.on { background: #aa0000; color: #fff; border-color: #ff2200; box-shadow: 0 0 8px rgba(255,30,0,0.55); }
 
     #fps { color: #777; font-size: 13px; white-space: nowrap; }
 
@@ -471,6 +474,7 @@
         <span id="tempHint" style="font-size:9px;color:#383838;letter-spacing:1px;white-space:nowrap;">WORLD THERMOSTAT — lava/fire/ice keep their own heat</span>
       </div>
       <button id="btnUnit">°C</button>
+      <button id="btnInferno">INFERNO</button>
     </div>
 
     <div class="sep"></div>
