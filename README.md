@@ -2,6 +2,8 @@
 
 A browser-based particle physics sandbox with 15 interactive materials, wind, temperature, and explosive chain reactions — built with vanilla JavaScript and Canvas.
 
+**Created by Tom Wellborn · 2026**
+
 **Live demo:** https://tommiew007.github.io/falling_sand/
 
 ![Falling Sand](https://img.shields.io/badge/built%20with-vanilla%20JS-yellow) ![License](https://img.shields.io/badge/license-MIT-blue)
