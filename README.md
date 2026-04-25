@@ -14,20 +14,20 @@ A browser-based particle physics sandbox with 15 interactive materials, wind, te
 
 | Key | Material | Behavior |
 |-----|----------|----------|
-| `1` | Sand | Falls and piles, sinks through water and oil, melts at extreme temps |
-| `2` | Water | Flows and spreads, sinks through oil, extinguishes fire, freezes below 32°F |
+| `1` | Acid | Sinks through water, dissolves most materials |
+| `2` | Electricity | Arcs through air, water, and acid; branches; ignites oil and wood on contact |
 | `3` | Fire | Rises, spreads to burnables, produces smoke, intensity affected by wind |
-| `4` | Plant | Grows slowly upward, burns, falls when unsupported |
-| `5` | Wood | Falls straight down, burns, does not slide diagonally |
-| `6` | Stone | Falls and piles, melts into lava above 2,000°F |
-| `7` | Oil | Floats on water, ignites easily from fire, lava, or electricity |
-| `8` | Smoke | Rises and drifts, bends strongly in wind, persists when enclosed |
-| `9` | Acid | Sinks through water, dissolves most materials |
-| `Q` | Lava | Flows at its own heat regardless of ambient temp, solidifies in cold environments |
-| `W` | Ice | Falls, melts near fire or lava, slowly freezes adjacent water |
-| `E` | Gunpowder | Falls like sand, detonates on contact with fire or lava — chain explosions |
-| `R` | Electricity | Arcs through air, water, and acid; branches; ignites oil and wood on contact |
-| `T` | Glass | Falls and piles, acid-resistant, melts to lava above 5,000°F — formed when sand melts |
+| `4` | Glass | Falls and piles, acid-resistant, melts to lava above 5,000°F — formed when sand melts |
+| `5` | Gunpowder | Falls like sand, detonates on contact with fire or lava — chain explosions |
+| `6` | Ice | Falls, melts near fire or lava, slowly freezes adjacent water |
+| `7` | Lava | Flows at its own heat regardless of ambient temp, solidifies in cold environments |
+| `8` | Oil | Floats on water, ignites easily from fire, lava, or electricity |
+| `9` | Plant | Grows slowly upward, burns, falls when unsupported |
+| `Q` | Sand | Falls and piles, sinks through water and oil, melts at extreme temps |
+| `W` | Smoke | Rises and drifts, bends strongly in wind, persists when enclosed |
+| `E` | Stone | Falls and piles, melts into lava above 2,000°F |
+| `R` | Water | Flows and spreads, sinks through oil, extinguishes fire, freezes below 32°F |
+| `T` | Wood | Falls straight down, burns, does not slide diagonally |
 | `0` | Erase | Remove cells |
 
 ---

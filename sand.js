@@ -23,21 +23,21 @@ const GLASS       = 14;
 
 // ─── Material display ─────────────────────────────────────────────────────────
 const MAT_INFO = [
-  { name: 'Erase',     color: '#1a1a1a', key: '0' },
-  { name: 'Sand',      color: '#c8a050', key: '1' },
-  { name: 'Water',     color: '#1a6fff', key: '2' },
-  { name: 'Fire',      color: '#ff5500', key: '3' },
-  { name: 'Plant',     color: '#22aa22', key: '4' },
-  { name: 'Wood',      color: '#8b5e3c', key: '5' },
-  { name: 'Stone',     color: '#888888', key: '6' },
-  { name: 'Oil',       color: '#a07810', key: '7' },
-  { name: 'Smoke',     color: '#666666', key: '8' },
-  { name: 'Acid',      color: '#39ff14', key: '9' },
-  { name: 'Lava',      color: '#ff6600', key: 'Q' },
-  { name: 'Ice',       color: '#a0dfff', key: 'W' },
-  { name: 'Gunpowder',   color: '#28241e', key: 'E' },
-  { name: 'Electricity', color: '#c8eeff', key: 'R' },
-  { name: 'Glass',       color: '#b8e0f8', key: 'T' },
+  { name: 'Erase',       color: '#1a1a1a', key: '0' },
+  { name: 'Sand',        color: '#c8a050', key: 'Q' },
+  { name: 'Water',       color: '#1a6fff', key: 'R' },
+  { name: 'Fire',        color: '#ff5500', key: '3' },
+  { name: 'Plant',       color: '#22aa22', key: '9' },
+  { name: 'Wood',        color: '#8b5e3c', key: 'T' },
+  { name: 'Stone',       color: '#888888', key: 'E' },
+  { name: 'Oil',         color: '#a07810', key: '8' },
+  { name: 'Smoke',       color: '#666666', key: 'W' },
+  { name: 'Acid',        color: '#39ff14', key: '1' },
+  { name: 'Lava',        color: '#ff6600', key: '7' },
+  { name: 'Ice',         color: '#a0dfff', key: '6' },
+  { name: 'Gunpowder',   color: '#28241e', key: '5' },
+  { name: 'Electricity', color: '#c8eeff', key: '2' },
+  { name: 'Glass',       color: '#b8e0f8', key: '4' },
 ];
 
 // ─── Canvas setup ─────────────────────────────────────────────────────────────
@@ -1145,11 +1145,11 @@ helpEl.addEventListener('mousedown', e => {
 
 // ─── Keyboard ─────────────────────────────────────────────────────────────────
 const KEY_MAP = {
-  '0': AIR,  '1': SAND, '2': WATER, '3': FIRE,  '4': PLANT,
-  '5': WOOD, '6': STONE,'7': OIL,   '8': SMOKE, '9': ACID,
-  'q': LAVA, 'Q': LAVA, 'w': ICE,   'W': ICE,   'e': GUNPOWDER, 'E': GUNPOWDER,
-  'r': ELECTRICITY, 'R': ELECTRICITY,
-  't': GLASS,       'T': GLASS,
+  '0': AIR,  '1': ACID,  '2': ELECTRICITY, '3': FIRE, '4': GLASS,
+  '5': GUNPOWDER, '6': ICE, '7': LAVA, '8': OIL, '9': PLANT,
+  'q': SAND,  'Q': SAND,  'w': SMOKE, 'W': SMOKE, 'e': STONE, 'E': STONE,
+  'r': WATER, 'R': WATER,
+  't': WOOD,  'T': WOOD,
 };
 
 window.addEventListener('keydown', e => {
