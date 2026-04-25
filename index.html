@@ -18,8 +18,10 @@
       font-family: 'Courier New', monospace;
     }
 
+    /* ── Viewport & canvas ───────────────────────────────────────────────── */
     #viewport {
       flex: 1;
+      position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -34,11 +36,109 @@
       image-rendering: crisp-edges;
     }
 
+    /* ── Help overlay ────────────────────────────────────────────────────── */
+    #help {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.88);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      cursor: pointer;
+      transition: opacity 0.45s ease;
+    }
+
+    #help.fading { opacity: 0; pointer-events: none; }
+
+    .help-box {
+      max-width: 580px;
+      width: 90%;
+      color: #ccc;
+      font: 13px/1.85 'Courier New', monospace;
+      padding: 32px 36px;
+      border: 1px solid #2a2a2a;
+      border-radius: 6px;
+      background: rgba(10,10,10,0.6);
+    }
+
+    .help-box h1 {
+      font-size: 18px;
+      letter-spacing: 4px;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+
+    .help-box .tagline {
+      color: #666;
+      font-size: 11px;
+      letter-spacing: 2px;
+      margin-bottom: 22px;
+    }
+
+    .help-section { margin-bottom: 18px; }
+
+    .help-section h3 {
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: #555;
+      margin-bottom: 6px;
+      border-bottom: 1px solid #1e1e1e;
+      padding-bottom: 4px;
+    }
+
+    .help-section p { color: #aaa; font-size: 12px; line-height: 1.7; }
+
+    .help-section .highlight { color: #e0e0e0; }
+
+    .temp-bar-preview {
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: linear-gradient(to right,
+        #0055ff, #44aaff, #ffffff, #ffdd00, #ff7700, #ff2200, #ffffff);
+      margin: 8px 0 4px;
+    }
+
+    .temp-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 9px;
+      color: #444;
+      margin-bottom: 4px;
+    }
+
+    .key-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 3px 8px;
+      font-size: 11px;
+      color: #999;
+    }
+
+    .key-grid span { white-space: nowrap; }
+    .key-grid .k { color: #666; }
+
+    .start-prompt {
+      margin-top: 22px;
+      text-align: center;
+      font-size: 12px;
+      color: #555;
+      letter-spacing: 2px;
+      animation: pulse 1.8s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 1; }
+    }
+
+    /* ── Bottom bar ──────────────────────────────────────────────────────── */
     #bar {
       width: 100%;
       background: #111;
-      border-top: 1px solid #222;
-      padding: 6px 10px;
+      border-top: 1px solid #1e1e1e;
+      padding: 5px 10px;
       display: flex;
       align-items: center;
       gap: 4px;
@@ -70,8 +170,8 @@
     .mat-btn.selected { border-color: #aaa; background: #1e1e1e; }
 
     .swatch {
-      width: 16px;
-      height: 16px;
+      width: 14px;
+      height: 14px;
       border-radius: 2px;
       border: 1px solid rgba(255,255,255,0.15);
       flex-shrink: 0;
@@ -80,40 +180,99 @@
     .mat-btn span { color: #bbb; font-size: 13px; }
     .mat-btn small { display: none; }
 
-    #sep { width: 1px; height: 30px; background: #2a2a2a; margin: 0 4px; flex-shrink: 0; }
+    .sep { width: 1px; height: 28px; background: #222; margin: 0 5px; flex-shrink: 0; }
 
+    /* ── Right controls ──────────────────────────────────────────────────── */
     #right-controls {
       margin-left: auto;
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
     }
 
     .ctrl-group {
       display: flex;
       align-items: center;
-      gap: 6px;
-      color: #666;
+      gap: 5px;
       font-size: 11px;
     }
 
-    .ctrl-group label { color: #888; }
+    .ctrl-group label { color: #666; }
+    .ctrl-group span  { color: #888; min-width: 14px; }
 
     input[type=range] {
-      width: 70px;
-      accent-color: #aaa;
+      width: 65px;
+      accent-color: #888;
+      cursor: pointer;
     }
 
-    #fps { color: #444; font-size: 11px; }
+    /* ── Temperature slider ──────────────────────────────────────────────── */
+    #temp-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    #temp-readout {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      line-height: 1.2;
+    }
+
+    #tempVal  { font-size: 16px; font-weight: bold; color: #ccc; white-space: nowrap; min-width: 80px; text-align: right; transition: color 0.4s; }
+    #tempDesc { font-size: 9px; color: #555; letter-spacing: 1px; transition: color 0.4s; }
+
+    /* gradient-backed range track */
+    #sTempSlider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 130px;
+      height: 5px;
+      border-radius: 3px;
+      cursor: pointer;
+      outline: none;
+      background: linear-gradient(to right,
+        #0055ff 0%,
+        #44aaff 3.2%,
+        #e0e0e0 7%,
+        #ffdd00 15%,
+        #ff7700 35%,
+        #ff2200 60%,
+        #ffffff 100%);
+    }
+
+    #sTempSlider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: #fff;
+      border: 2px solid rgba(0,0,0,0.4);
+      box-shadow: 0 0 4px rgba(255,255,255,0.3);
+      cursor: pointer;
+    }
+
+    #sTempSlider::-moz-range-thumb {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: #fff;
+      border: 2px solid rgba(0,0,0,0.4);
+      cursor: pointer;
+    }
+
+    #fps { color: #444; font-size: 11px; white-space: nowrap; }
 
     button {
       background: #1a1a1a;
-      color: #888;
+      color: #777;
       border: 1px solid #2a2a2a;
-      padding: 4px 10px;
+      padding: 4px 9px;
       font: 11px 'Courier New', monospace;
       cursor: pointer;
       border-radius: 3px;
+      white-space: nowrap;
     }
     button:hover { color: #ccc; border-color: #444; }
   </style>
@@ -122,17 +281,101 @@
 
 <div id="viewport">
   <canvas id="canvas"></canvas>
+
+  <!-- Help overlay — dismissed on first interaction -->
+  <div id="help">
+    <div class="help-box">
+      <h1>FALLING SAND</h1>
+      <p class="tagline">PARTICLE PHYSICS SANDBOX</p>
+
+      <div class="help-section">
+        <h3>TEMPERATURE</h3>
+        <div class="temp-bar-preview"></div>
+        <div class="temp-labels">
+          <span>0°F  Frozen</span>
+          <span>212°F  Boiling</span>
+          <span>2,000°F  Extreme</span>
+          <span>10,000°F  Plasma</span>
+        </div>
+        <p>
+          Drag the <span class="highlight">temperature slider</span> to change the ambient environment.
+          Below <span class="highlight">32°F</span> water freezes and lava solidifies.
+          Above <span class="highlight">480°F</span> wood and oil spontaneously combust.
+          Above <span class="highlight">2,000°F</span> stone melts back into lava.
+          Toggle <span class="highlight">°F / °C</span> at any time.
+        </p>
+      </div>
+
+      <div class="help-section">
+        <h3>MATERIALS  —  click a button or press the shortcut key</h3>
+        <div class="key-grid">
+          <span><span class="k">1</span> Sand</span>
+          <span><span class="k">2</span> Water</span>
+          <span><span class="k">3</span> Fire</span>
+          <span><span class="k">4</span> Plant</span>
+          <span><span class="k">5</span> Wood</span>
+          <span><span class="k">6</span> Stone</span>
+          <span><span class="k">7</span> Oil</span>
+          <span><span class="k">8</span> Smoke</span>
+          <span><span class="k">9</span> Acid</span>
+          <span><span class="k">Q</span> Lava</span>
+          <span><span class="k">W</span> Ice</span>
+          <span><span class="k">0</span> Erase</span>
+        </div>
+      </div>
+
+      <div class="help-section">
+        <h3>CONTROLS</h3>
+        <p>
+          <span class="highlight">Click / drag</span> to paint &nbsp;·&nbsp;
+          <span class="highlight">[ ]</span> brush size &nbsp;·&nbsp;
+          <span class="highlight">C</span> clear &nbsp;·&nbsp;
+          <span class="highlight">P</span> pause
+        </p>
+      </div>
+
+      <div class="help-section">
+        <h3>TRY THESE</h3>
+        <p>
+          Pour water over oil — watch it sink &nbsp;·&nbsp;
+          Drop lava into water — instant stone + steam<br>
+          Slide temperature to max and wait &nbsp;·&nbsp;
+          Build an ice wall, pour acid on it
+        </p>
+      </div>
+
+      <p class="start-prompt">CLICK ANYWHERE TO BEGIN ▶</p>
+    </div>
+  </div>
 </div>
 
 <div id="bar">
   <div id="palette"></div>
-  <div id="sep"></div>
+
+  <div class="sep"></div>
+
   <div id="right-controls">
+    <!-- Brush -->
     <div class="ctrl-group">
       <label>brush</label>
       <input id="sBrush" type="range" min="1" max="20" value="4">
       <span id="vBrush">4</span>
     </div>
+
+    <div class="sep"></div>
+
+    <!-- Temperature -->
+    <div id="temp-wrap">
+      <div id="temp-readout">
+        <span id="tempVal">70°F</span>
+        <span id="tempDesc">NORMAL</span>
+      </div>
+      <input id="sTempSlider" type="range" min="0" max="10000" value="70">
+      <button id="btnUnit">°C</button>
+    </div>
+
+    <div class="sep"></div>
+
     <button id="btnClear">clear (C)</button>
     <button id="btnPause">pause (P)</button>
     <span id="fps">fps: —</span>

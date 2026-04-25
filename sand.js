@@ -41,22 +41,37 @@ canvas.width  = W;
 canvas.height = H;
 
 // ─── Simulation state ─────────────────────────────────────────────────────────
-const grid      = new Uint8Array(W * H);   // material type
-const colorVar  = new Uint8Array(W * H);   // per-cell color noise (static)
-const meta      = new Uint16Array(W * H);  // fire/smoke lifetime, etc.
-const processed = new Uint8Array(W * H);   // updated this frame?
+const grid      = new Uint8Array(W * H);
+const colorVar  = new Uint8Array(W * H);
+const meta      = new Uint16Array(W * H);
+const processed = new Uint8Array(W * H);
 
 const imgData = ctx.createImageData(W, H);
 const pixels  = imgData.data;
 
-let frame   = 0;
-let paused  = false;
+let frame  = 0;
+let paused = false;
+
+// ─── Ambient temperature ──────────────────────────────────────────────────────
+// Stored internally in Fahrenheit. Range 0–10,000°F.
+let ambientF   = 70;
+let useCelsius = false;
+
+// Key thresholds (°F)
+const T_FREEZE     =   32;   // water ↔ ice
+const T_BOIL       =  212;   // water → steam
+const T_OIL_FLASH  =  500;   // oil auto-ignites
+const T_WOOD_BURN  =  480;   // wood / plant auto-ignites
+const T_LAVA_COOL  = 1300;   // lava solidifies without water below this
+const T_STONE_MELT = 2000;   // stone → lava
+const T_SAND_MELT  = 3100;   // sand → lava (silica melting point)
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const inBounds  = (x, y) => x >= 0 && x < W && y >= 0 && y < H;
 const idx       = (x, y) => y * W + x;
 const rand      = ()     => Math.random();
 const randInt   = n      => (Math.random() * n) | 0;
+const clamp     = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
 
 function setCel(x, y, mat, life) {
   const i = idx(x, y);
@@ -75,7 +90,6 @@ function swapCells(i, j) {
 }
 
 const isBurnable = mat => mat === WOOD || mat === PLANT || mat === OIL;
-const isLiquid   = mat => mat === WATER || mat === OIL || mat === ACID;
 const isPassable = mat => mat === AIR || mat === SMOKE;
 
 // ─── Per-material update ──────────────────────────────────────────────────────
@@ -87,12 +101,14 @@ function updateCell(x, y) {
 
   // ── Sand ──────────────────────────────────────────────────────────────────
   if (mat === SAND) {
+    // Ambient melt at extreme temps (silica melts ~3100°F)
+    if (ambientF > T_SAND_MELT && rand() < clamp((ambientF - T_SAND_MELT) / 275000, 0, 0.025)) {
+      grid[i] = LAVA; colorVar[i] = (rand()*255)|0; meta[i] = 0; processed[i] = 1; return;
+    }
     if (y < H - 1) {
       const dn = idx(x, y + 1);
       const bt = grid[dn];
-      // Sand is denser than water and oil — sinks through both
       if (bt === AIR || bt === SMOKE || bt === WATER || bt === OIL) { swapCells(i, dn); return; }
-
       const d = rand() < 0.5 ? 1 : -1;
       for (const dx of [d, -d]) {
         const nx = x + dx;
@@ -107,10 +123,17 @@ function updateCell(x, y) {
 
   // ── Water ─────────────────────────────────────────────────────────────────
   if (mat === WATER) {
+    // Freeze below 32°F
+    if (ambientF < T_FREEZE && rand() < clamp((T_FREEZE - ambientF) / 8000, 0, 0.04)) {
+      setCel(x, y, ICE); processed[i] = 1; return;
+    }
+    // Evaporate above 212°F
+    if (ambientF > T_BOIL && rand() < clamp((ambientF - T_BOIL) / 196000, 0, 0.05)) {
+      grid[i] = SMOKE; meta[i] = (rand()*60+30)|0; colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
+    }
     if (y < H - 1) {
       const dn = idx(x, y + 1);
       const bt = grid[dn];
-      // Water is denser than oil — sinks through it (oil rises)
       if (isPassable(bt) || bt === OIL) { swapCells(i, dn); return; }
     }
     const d      = rand() < 0.5 ? 1 : -1;
@@ -129,6 +152,10 @@ function updateCell(x, y) {
 
   // ── Oil ───────────────────────────────────────────────────────────────────
   if (mat === OIL) {
+    // Auto-ignition above flash point
+    if (ambientF > T_OIL_FLASH && rand() < clamp((ambientF - T_OIL_FLASH) / 475000, 0, 0.02)) {
+      grid[i] = FIRE; meta[i] = (rand()*120+80)|0; colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
+    }
     if (y < H - 1) {
       const dn = idx(x, y + 1);
       if (isPassable(grid[dn])) { swapCells(i, dn); return; }
@@ -149,7 +176,9 @@ function updateCell(x, y) {
 
   // ── Fire ──────────────────────────────────────────────────────────────────
   if (mat === FIRE) {
-    meta[i]--;
+    // Cold air kills fire faster; hot air makes it last longer
+    const burnRate = ambientF < T_FREEZE ? 3 : ambientF < 100 ? 2 : 1;
+    meta[i] -= burnRate;
 
     if (meta[i] <= 0) {
       grid[i]     = rand() < 0.55 ? SMOKE : AIR;
@@ -159,29 +188,26 @@ function updateCell(x, y) {
       return;
     }
 
-    // Water extinguishes fire — check all 4 neighbors directly
+    // Water extinguishes — check all 4 neighbors
     for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
       const nx = x + dx, ny = y + dy;
       if (!inBounds(nx, ny)) continue;
       const ni = idx(nx, ny);
       if (grid[ni] === WATER && rand() < 0.3) {
-        grid[ni]     = SMOKE;
-        meta[ni]     = (rand() * 30 + 10) | 0;
-        grid[i]      = SMOKE;
-        meta[i]      = (rand() * 30 + 10) | 0;
-        processed[i] = 1;
-        return;
+        grid[ni]     = SMOKE; meta[ni]     = (rand()*30+10)|0;
+        grid[i]      = SMOKE; meta[i]      = (rand()*30+10)|0;
+        processed[i] = 1; return;
       }
     }
 
-    // Spread to burnable neighbors
-    if (rand() < 0.07) {
+    // Spread to burnable neighbors — faster in hot ambient
+    const spreadChance = clamp(0.07 * (1 + ambientF / 5000), 0.04, 0.18);
+    if (rand() < spreadChance) {
       const nx = x + randInt(3) - 1;
       const ny = y + randInt(3) - 1;
       if (inBounds(nx, ny)) {
         const ni = idx(nx, ny);
-        const nt = grid[ni];
-        if (isBurnable(nt)) {
+        if (isBurnable(grid[ni])) {
           grid[ni]     = FIRE;
           meta[ni]     = (rand() * 100 + 60) | 0;
           colorVar[ni] = (rand() * 255) | 0;
@@ -193,7 +219,6 @@ function updateCell(x, y) {
     if (y > 0 && rand() < 0.5) {
       const up = idx(x, y - 1);
       if (isPassable(grid[up])) { swapCells(i, up); return; }
-      // try up-diag
       const dx = rand() < 0.5 ? 1 : -1;
       if (inBounds(x + dx, y - 1)) {
         const ui = idx(x + dx, y - 1);
@@ -206,11 +231,7 @@ function updateCell(x, y) {
   // ── Smoke ─────────────────────────────────────────────────────────────────
   if (mat === SMOKE) {
     meta[i]--;
-    if (meta[i] <= 0) {
-      grid[i] = AIR;
-      processed[i] = 1;
-      return;
-    }
+    if (meta[i] <= 0) { grid[i] = AIR; processed[i] = 1; return; }
     if (y > 0) {
       const dx = rand() < 0.3 ? (rand() < 0.5 ? 1 : -1) : 0;
       const nx = x + dx;
@@ -226,41 +247,35 @@ function updateCell(x, y) {
 
   // ── Lava ──────────────────────────────────────────────────────────────────
   if (mat === LAVA) {
-    // Check all 4 cardinal neighbors for water/ice/burnable reactions
+    // Ambient cooling — solidifies without water at low temps
+    if (ambientF < T_LAVA_COOL && rand() < clamp((T_LAVA_COOL - ambientF) / 2600000, 0, 0.005)) {
+      grid[i] = STONE; colorVar[i] = (rand()*255)|0; meta[i] = 0; processed[i] = 1; return;
+    }
+
+    // React with all 4 cardinal neighbors
     for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
       const nx = x + dx, ny = y + dy;
       if (!inBounds(nx, ny)) continue;
       const ni = idx(nx, ny);
       const nt = grid[ni];
 
-      // Lava + water → lava solidifies to stone, water vaporises
+      // Lava + water → stone + steam
       if (nt === WATER && rand() < 0.4) {
-        grid[i]      = STONE;
-        colorVar[i]  = (rand() * 255) | 0;
-        meta[i]      = 0;
-        grid[ni]     = SMOKE;
-        meta[ni]     = (rand() * 50 + 30) | 0;
-        colorVar[ni] = (rand() * 255) | 0;
-        processed[i] = 1;
-        return;
+        grid[i]      = STONE; colorVar[i]  = (rand()*255)|0; meta[i]      = 0;
+        grid[ni]     = SMOKE; meta[ni]     = (rand()*50+30)|0; colorVar[ni] = (rand()*255)|0;
+        processed[i] = 1; return;
       }
-
-      // Lava ignites adjacent burnables (oil catches very readily)
-      if (isBurnable(nt) && rand() < (nt === OIL ? 0.15 : 0.05)) {
-        grid[ni]     = FIRE;
-        meta[ni]     = (rand() * 100 + 60) | 0;
-        colorVar[ni] = (rand() * 255) | 0;
-      }
-
-      // Lava melts adjacent stone back into lava (lava is liquid rock)
+      // Lava melts adjacent stone back into lava
       if (nt === STONE && rand() < 0.08) {
-        grid[ni]     = LAVA;
-        colorVar[ni] = (rand() * 255) | 0;
-        meta[ni]     = 0;
+        grid[ni] = LAVA; colorVar[ni] = (rand()*255)|0; meta[ni] = 0;
+      }
+      // Lava ignites burnables (oil ignites very readily)
+      if (isBurnable(nt) && rand() < (nt === OIL ? 0.15 : 0.05)) {
+        grid[ni] = FIRE; meta[ni] = (rand()*100+60)|0; colorVar[ni] = (rand()*255)|0;
       }
     }
 
-    // Fall slowly (thick liquid)
+    // Fall slowly
     if (y < H - 1 && rand() < 0.45) {
       const dn = idx(x, y + 1);
       const bt = grid[dn];
@@ -282,8 +297,9 @@ function updateCell(x, y) {
 
   // ── Acid ──────────────────────────────────────────────────────────────────
   if (mat === ACID) {
-    // Dissolve adjacent non-acid cells
-    if (rand() < 0.06) {
+    // Dissolves faster at higher ambient temps
+    const dissolveRate = clamp(0.06 * (1 + ambientF / 5000), 0.03, 0.14);
+    if (rand() < dissolveRate) {
       const offsets = [[-1,0],[1,0],[0,-1],[0,1]];
       for (const [dx, dy] of offsets) {
         const nx = x + dx, ny = y + dy;
@@ -291,25 +307,18 @@ function updateCell(x, y) {
         const ni = idx(nx, ny);
         const nt = grid[ni];
         if (nt !== AIR && nt !== ACID && nt !== SMOKE) {
-          grid[ni]     = SMOKE;  // dissolve → puff of smoke
-          meta[ni]     = (rand() * 20 + 5) | 0;
-          colorVar[ni] = (rand() * 255) | 0;
-          if (rand() < 0.2) {   // acid gets consumed
-            grid[i]      = AIR;
-            processed[i] = 1;
-            return;
-          }
+          grid[ni]     = SMOKE; meta[ni]     = (rand()*20+5)|0; colorVar[ni] = (rand()*255)|0;
+          if (rand() < 0.2) { grid[i] = AIR; processed[i] = 1; return; }
           break;
         }
       }
     }
-    // Fall — acid is denser than water, sinks through it
+    // Acid is denser than water — sinks through it
     if (y < H - 1) {
       const dn = idx(x, y + 1);
       const bt = grid[dn];
       if (isPassable(bt) || bt === WATER) { swapCells(i, dn); return; }
     }
-    // Flow sideways
     const d      = rand() < 0.5 ? 1 : -1;
     const spread = 2 + randInt(3);
     for (const dir of [d, -d]) {
@@ -326,16 +335,18 @@ function updateCell(x, y) {
 
   // ── Plant ─────────────────────────────────────────────────────────────────
   if (mat === PLANT) {
+    // Auto-ignition above wood/plant burn threshold
+    if (ambientF > T_WOOD_BURN && rand() < clamp((ambientF - T_WOOD_BURN) / 640000, 0, 0.015)) {
+      grid[i] = FIRE; meta[i] = (rand()*100+60)|0; colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
+    }
+    // Grow slowly (upward preference)
     if (rand() < 0.004) {
-      // Grow toward light (upward preference)
       const dx = randInt(3) - 1;
       const dy = rand() < 0.65 ? -1 : randInt(3) - 1;
       const nx = x + dx, ny = y + dy;
       if (inBounds(nx, ny)) {
         const ni = idx(nx, ny);
-        if (grid[ni] === AIR || grid[ni] === WATER) {
-          setCel(nx, ny, PLANT);
-        }
+        if (grid[ni] === AIR || grid[ni] === WATER) setCel(nx, ny, PLANT);
       }
     }
     return;
@@ -343,6 +354,10 @@ function updateCell(x, y) {
 
   // ── Stone ─────────────────────────────────────────────────────────────────
   if (mat === STONE) {
+    // Melts into lava at extreme temps
+    if (ambientF > T_STONE_MELT && rand() < clamp((ambientF - T_STONE_MELT) / 400000, 0, 0.02)) {
+      grid[i] = LAVA; colorVar[i] = (rand()*255)|0; meta[i] = 0; processed[i] = 1; return;
+    }
     if (y < H - 1) {
       const dn = idx(x, y + 1);
       const bt = grid[dn];
@@ -375,61 +390,62 @@ function updateCell(x, y) {
         if (dt === AIR || dt === SMOKE || dt === WATER) { swapCells(i, di); return; }
       }
     }
-    // Melt near heat sources — lava is near-instant, fire is gradual
+
+    // Lava contact: near-instant vaporisation to steam
+    // Fire contact: gradual melt to water
     for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
       const nx = x + dx, ny = y + dy;
       if (!inBounds(nx, ny)) continue;
       const nt = grid[idx(nx, ny)];
       if (nt === LAVA && rand() < 0.85) {
-        // Lava flash-vaporises ice → steam burst
-        grid[i]     = SMOKE;
-        meta[i]     = (rand() * 60 + 40) | 0;
-        colorVar[i] = (rand() * 255) | 0;
-        processed[i] = 1;
-        // Scatter extra steam puffs into nearby air cells
+        grid[i] = SMOKE; meta[i] = (rand()*60+40)|0; colorVar[i] = (rand()*255)|0;
         for (const [sx, sy] of [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0]]) {
-          const snx = x + sx, sny = y + sy;
-          if (!inBounds(snx, sny)) continue;
-          if (grid[idx(snx, sny)] === AIR) {
-            grid[idx(snx, sny)]     = SMOKE;
-            meta[idx(snx, sny)]     = (rand() * 40 + 20) | 0;
-            colorVar[idx(snx, sny)] = (rand() * 255) | 0;
-          }
+          const snx = x+sx, sny = y+sy;
+          if (!inBounds(snx,sny)) continue;
+          const si = idx(snx,sny);
+          if (grid[si] === AIR) { grid[si] = SMOKE; meta[si] = (rand()*40+20)|0; colorVar[si] = (rand()*255)|0; }
         }
-        return;
+        processed[i] = 1; return;
       }
       if (nt === FIRE && rand() < 0.06) {
-        // Fire slowly melts ice → water
-        grid[i]     = WATER;
-        colorVar[i] = (rand() * 255) | 0;
-        meta[i]     = 0;
-        processed[i] = 1;
-        return;
+        grid[i] = WATER; colorVar[i] = (rand()*255)|0; meta[i] = 0; processed[i] = 1; return;
       }
     }
-    // Slow freeze: water adjacent to ice may turn to ice
-    if (rand() < 0.001) {
+
+    // Ambient melt — rate proportional to how far above freezing
+    if (ambientF > T_FREEZE && rand() < clamp((ambientF - T_FREEZE) / 24200, 0, 0.04)) {
+      grid[i]     = ambientF > T_BOIL ? SMOKE : WATER;
+      colorVar[i] = (rand()*255)|0; meta[i] = 0; processed[i] = 1; return;
+    }
+
+    // Freeze adjacent water — faster at lower temps
+    const freezeProb = ambientF < T_FREEZE
+      ? clamp((T_FREEZE - ambientF) / 1067, 0, 0.03)
+      : 0.0001;
+    if (rand() < freezeProb) {
       for (const [dx, dy] of [[-1,0],[1,0],[0,1]]) {
-        const nx = x + dx, ny = y + dy;
-        if (!inBounds(nx, ny)) continue;
-        const ni = idx(nx, ny);
-        if (grid[ni] === WATER) {
-          setCel(nx, ny, ICE);
-          break;
-        }
+        const nx = x+dx, ny = y+dy;
+        if (!inBounds(nx,ny)) continue;
+        if (grid[idx(nx,ny)] === WATER) { setCel(nx, ny, ICE); break; }
       }
     }
     return;
   }
 
-  // WOOD: static — fire handles spreading to it
+  // ── Wood ──────────────────────────────────────────────────────────────────
+  if (mat === WOOD) {
+    // Auto-ignition at high temps (wood ignition ~480°F)
+    if (ambientF > T_WOOD_BURN && rand() < clamp((ambientF - T_WOOD_BURN) / 1200000, 0, 0.008)) {
+      grid[i] = FIRE; meta[i] = (rand()*150+80)|0; colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
+    }
+    return;
+  }
 }
 
 // ─── Simulation step ──────────────────────────────────────────────────────────
 function step() {
   processed.fill(0);
   const ltr = frame % 2 === 0;
-
   for (let y = H - 1; y >= 0; y--) {
     if (ltr) {
       for (let x = 0;     x < W;  x++) updateCell(x, y);
@@ -441,26 +457,24 @@ function step() {
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────────
-// Base colors per material [r, g, b]
 const BASE = [
   [0,   0,   0  ],  // AIR
   [200, 158,  80],  // SAND
-  [25,  115, 255],  // WATER  (overridden)
-  [255,  80,   0],  // FIRE   (overridden)
+  [25,  115, 255],  // WATER
+  [255,  80,   0],  // FIRE
   [28,  130,  22],  // PLANT
   [115,  75,  40],  // WOOD
   [108, 108, 108],  // STONE
   [148, 112,  18],  // OIL
-  [85,   85,  85],  // SMOKE  (overridden)
-  [20,  220,  10],  // ACID   (overridden)
-  [255,  80,   0],  // LAVA   (overridden)
+  [85,   85,  85],  // SMOKE
+  [20,  220,  10],  // ACID
+  [255,  80,   0],  // LAVA
   [155, 220, 255],  // ICE
 ];
 const VAR = [0, 28, 0, 0, 22, 22, 18, 16, 0, 0, 0, 12];
 
 function render() {
   const t = frame;
-
   for (let i = 0, p = 0; i < W * H; i++, p += 4) {
     const mat = grid[i];
     const cv  = colorVar[i];
@@ -468,7 +482,7 @@ function render() {
     let r = 0, g = 0, b = 0;
 
     if (mat === AIR) {
-      // black — fall through
+      // black
     } else if (mat === FIRE) {
       const heat    = Math.min(lf / 80, 1);
       const flicker = 0.75 + (cv / 255) * 0.25;
@@ -508,7 +522,6 @@ function render() {
     pixels[p + 2] = b;
     pixels[p + 3] = 255;
   }
-
   ctx.putImageData(imgData, 0, 0);
 }
 
@@ -516,9 +529,9 @@ function render() {
 const viewport = document.getElementById('viewport');
 
 function fitCanvas() {
-  const vw     = viewport.clientWidth;
-  const vh     = viewport.clientHeight;
-  const scale  = Math.min(vw / W, vh / H);
+  const vw    = viewport.clientWidth;
+  const vh    = viewport.clientHeight;
+  const scale = Math.min(vw / W, vh / H);
   canvas.style.width  = (W * scale) + 'px';
   canvas.style.height = (H * scale) + 'px';
 }
@@ -542,12 +555,11 @@ function toGrid(clientX, clientY) {
 }
 
 function paintAt(gx, gy) {
-  const r    = brushSize;
-  const r2   = r * r;
+  const r   = brushSize;
+  const r2  = r * r;
   const life = selectedMat === FIRE  ? ((rand() * 100 + 60) | 0)
              : selectedMat === SMOKE ? ((rand() * 50  + 20) | 0)
              : 0;
-
   for (let dy = -r; dy <= r; dy++) {
     for (let dx = -r; dx <= r; dx++) {
       if (dx * dx + dy * dy > r2) continue;
@@ -559,7 +571,6 @@ function paintAt(gx, gy) {
 }
 
 function paintLine(x0, y0, x1, y1) {
-  // Bresenham to avoid gaps when dragging fast
   let dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
   const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
   let err = dx - dy;
@@ -586,31 +597,93 @@ function onPointerMove(clientX, clientY) {
 }
 function onPointerUp() { painting = false; }
 
-canvas.addEventListener('mousedown',  e => { e.preventDefault(); onPointerDown(e.clientX, e.clientY); });
+canvas.addEventListener('mousedown',  e => { e.preventDefault(); dismissHelp(); onPointerDown(e.clientX, e.clientY); });
 canvas.addEventListener('mousemove',  e => onPointerMove(e.clientX, e.clientY));
 window.addEventListener('mouseup',    () => onPointerUp());
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 
-canvas.addEventListener('touchstart', e => { e.preventDefault(); onPointerDown(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+canvas.addEventListener('touchstart', e => { e.preventDefault(); dismissHelp(); onPointerDown(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
 canvas.addEventListener('touchmove',  e => { e.preventDefault(); onPointerMove(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
 window.addEventListener('touchend',   () => onPointerUp());
 
+// ─── Help overlay ─────────────────────────────────────────────────────────────
+let helpDismissed = false;
+
+function dismissHelp() {
+  if (helpDismissed) return;
+  helpDismissed = true;
+  const el = document.getElementById('help');
+  el.style.pointerEvents = 'none'; // pass events to canvas immediately
+  el.classList.add('fading');
+  setTimeout(() => { el.style.display = 'none'; }, 480);
+}
+
+// Clicking the overlay dismisses it AND starts painting at that position
+document.getElementById('help').addEventListener('mousedown', e => {
+  e.preventDefault();
+  dismissHelp();
+  onPointerDown(e.clientX, e.clientY);
+});
+
 // ─── Keyboard ─────────────────────────────────────────────────────────────────
 const KEY_MAP = {
-  '0': AIR, '1': SAND, '2': WATER, '3': FIRE,  '4': PLANT,
-  '5': WOOD,'6': STONE,'7': OIL,   '8': SMOKE, '9': ACID,
-  'q': LAVA, 'Q': LAVA, 'w': ICE, 'W': ICE,
+  '0': AIR,  '1': SAND, '2': WATER, '3': FIRE,  '4': PLANT,
+  '5': WOOD, '6': STONE,'7': OIL,   '8': SMOKE, '9': ACID,
+  'q': LAVA, 'Q': LAVA, 'w': ICE,   'W': ICE,
 };
 
 window.addEventListener('keydown', e => {
-  if (e.key in KEY_MAP) {
-    selectedMat = KEY_MAP[e.key];
-    updatePaletteUI();
-  }
-  if (e.key === 'c' || e.key === 'C') clearGrid();
-  if (e.key === 'p' || e.key === 'P') togglePause();
-  if (e.key === '[') { brushSize = Math.max(1, brushSize - 1);  updateBrushUI(); }
+  if (e.key in KEY_MAP)               { dismissHelp(); selectedMat = KEY_MAP[e.key]; updatePaletteUI(); }
+  if (e.key === 'c' || e.key === 'C') { dismissHelp(); clearGrid(); }
+  if (e.key === 'p' || e.key === 'P') { dismissHelp(); togglePause(); }
+  if (e.key === '[') { brushSize = Math.max(1,  brushSize - 1); updateBrushUI(); }
   if (e.key === ']') { brushSize = Math.min(20, brushSize + 1); updateBrushUI(); }
+});
+
+// ─── Temperature UI ───────────────────────────────────────────────────────────
+function tempDescriptor(f) {
+  if (f <    0) return 'ARCTIC';
+  if (f <   32) return 'BELOW FREEZING';
+  if (f <  100) return 'COLD';
+  if (f <  212) return 'NORMAL';
+  if (f <  480) return 'HOT';
+  if (f < 1300) return 'COMBUSTION';
+  if (f < 3100) return 'EXTREME';
+  if (f < 6000) return 'INFERNO';
+  return 'PLASMA';
+}
+
+function tempColor(f) {
+  if (f <   32) return '#66aaff';   // icy blue
+  if (f <  212) return '#cccccc';   // neutral
+  if (f <  480) return '#ffdd44';   // warm yellow
+  if (f < 1300) return '#ff8800';   // orange
+  if (f < 3100) return '#ff3300';   // red
+  return '#ffffff';                  // white-hot / plasma
+}
+
+function updateTempDisplay() {
+  const display = useCelsius
+    ? Math.round((ambientF - 32) * 5 / 9) + '°C'
+    : Math.round(ambientF) + '°F';
+  const col = tempColor(ambientF);
+  const valEl  = document.getElementById('tempVal');
+  const descEl = document.getElementById('tempDesc');
+  valEl.textContent  = display;
+  valEl.style.color  = col;
+  descEl.textContent = tempDescriptor(ambientF);
+  descEl.style.color = col;
+}
+
+document.getElementById('sTempSlider').addEventListener('input', function () {
+  ambientF = parseInt(this.value);
+  updateTempDisplay();
+});
+
+document.getElementById('btnUnit').addEventListener('click', () => {
+  useCelsius = !useCelsius;
+  document.getElementById('btnUnit').textContent = useCelsius ? '°F' : '°C';
+  updateTempDisplay();
 });
 
 // ─── Palette UI ───────────────────────────────────────────────────────────────
@@ -621,13 +694,12 @@ function updatePaletteUI() {
 }
 
 function updateBrushUI() {
-  document.getElementById('sBrush').value    = brushSize;
+  document.getElementById('sBrush').value       = brushSize;
   document.getElementById('vBrush').textContent = brushSize;
 }
 
 function clearGrid() {
-  grid.fill(AIR);
-  meta.fill(0);
+  grid.fill(AIR); meta.fill(0);
 }
 
 function togglePause() {
@@ -641,8 +713,7 @@ MAT_INFO.forEach((m, i) => {
   btn.className = 'mat-btn' + (i === SAND ? ' selected' : '');
   btn.innerHTML =
     `<div class="swatch" style="background:${m.color}"></div>` +
-    `<span>${m.name}</span>` +
-    `<small>${m.key}</small>`;
+    `<span>${m.name}</span>`;
   btn.addEventListener('click', () => { selectedMat = i; updatePaletteUI(); });
   palette.appendChild(btn);
 });
@@ -655,27 +726,24 @@ document.getElementById('btnClear').addEventListener('click', clearGrid);
 document.getElementById('btnPause').addEventListener('click', togglePause);
 
 // ─── FPS ──────────────────────────────────────────────────────────────────────
-let lastT   = 0;
-let fcount  = 0;
+let lastT  = 0;
+let fcount = 0;
 const fpsEl = document.getElementById('fps');
 
 function tickFPS(now) {
   fcount++;
   if (now - lastT >= 1000) {
     fpsEl.textContent = `fps: ${fcount}`;
-    fcount = 0;
-    lastT  = now;
+    fcount = 0; lastT = now;
   }
 }
 
 // ─── Main loop ────────────────────────────────────────────────────────────────
 function loop(now) {
   tickFPS(now);
-  if (!paused) {
-    step();
-    render();
-  }
+  if (!paused) { step(); render(); }
   requestAnimationFrame(loop);
 }
 
+updateTempDisplay();
 requestAnimationFrame(loop);
