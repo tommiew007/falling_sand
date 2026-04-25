@@ -390,6 +390,7 @@ function updateCell(x, y) {
 
   // ── Fire ──────────────────────────────────────────────────────────────────
   if (mat === FIRE) {
+    if (y === 0) { grid[i] = AIR; processed[i] = 1; return; } // exit top of frame
     // Cold air kills fire faster; hot air makes it last longer
     const burnRate = ambientF < T_FREEZE ? 3 : ambientF < 100 ? 2 : 1;
     meta[i] -= burnRate;
@@ -450,6 +451,7 @@ function updateCell(x, y) {
 
   // ── Smoke ─────────────────────────────────────────────────────────────────
   if (mat === SMOKE) {
+    if (y === 0) { grid[i] = AIR; processed[i] = 1; return; } // exit top of frame
     // Only age smoke when it has somewhere to escape — trapped smoke persists
     const hasEscape = (
       (y > 0     && (grid[idx(x, y-1)] === AIR || (x > 0     && grid[idx(x-1, y-1)] === AIR) || (x < W-1 && grid[idx(x+1, y-1)] === AIR))) ||
