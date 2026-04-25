@@ -101,46 +101,9 @@ let useCelsius = false;
 let infernoOn    = false;
 let preInfernoF  = 70;  // temp saved before Inferno activates
 
-// Piecewise linear curve: [sliderPct (0–100), tempF]
-// Key thresholds each get proportional slider travel so precision is
-// highest where it matters (low–mid temps).
-const TEMP_CURVE = [
-  [  0,     0],
-  [ 15,    32],   // freeze
-  [ 25,   212],   // boiling
-  [ 35,   480],   // combustion / wood ignition
-  [ 50,  1300],   // lava stays molten
-  [ 65,  2000],   // stone melts
-  [ 80,  3100],   // sand melts (silica)
-  [100,  5000],   // glass melts to lava (slider max)
-];
-
-function sliderToTemp(pct) {
-  for (let i = 1; i < TEMP_CURVE.length; i++) {
-    const [p0, t0] = TEMP_CURVE[i - 1];
-    const [p1, t1] = TEMP_CURVE[i];
-    if (pct <= p1) {
-      return Math.round(t0 + (pct - p0) / (p1 - p0) * (t1 - t0));
-    }
-  }
-  return 10000;
-}
-
-function tempToSlider(temp) {
-  for (let i = 1; i < TEMP_CURVE.length; i++) {
-    const [p0, t0] = TEMP_CURVE[i - 1];
-    const [p1, t1] = TEMP_CURVE[i];
-    if (temp <= t1) {
-      return p0 + (temp - t0) / (t1 - t0) * (p1 - p0);
-    }
-  }
-  return 100;
-}
-
-// Slider stores 0–1000 (= pct × 10) for fine integer resolution
+// Slider is direct °F, range 0–5000, step 10
 function syncSlider() {
-  document.getElementById('sTempSlider').value =
-    Math.round(tempToSlider(ambientF) * 10);
+  document.getElementById('sTempSlider').value = Math.round(ambientF / 10) * 10;
 }
 
 // Key thresholds (°F)
@@ -1283,9 +1246,9 @@ function updateTempDisplay() {
 
 const sliderEl = document.getElementById('sTempSlider');
 
-// Dragging — piecewise non-linear mapping
+// Dragging — direct °F value
 sliderEl.addEventListener('input', function () {
-  ambientF = sliderToTemp(parseInt(this.value) / 10);
+  ambientF = parseInt(this.value);
   updateTempDisplay();
 });
 
