@@ -144,9 +144,16 @@ function updateCell(x, y) {
 
   // ── Sand ──────────────────────────────────────────────────────────────────
   if (mat === SAND) {
-    // Ambient melt at extreme temps (silica melts ~3100°F)
-    if (ambientF > T_SAND_MELT && rand() < clamp((ambientF - T_SAND_MELT) / 275000, 0, 0.025)) {
-      grid[i] = LAVA; colorVar[i] = (rand()*255)|0; meta[i] = 0; processed[i] = 1; return;
+    // Melt at extreme temps — scales to ~70% chance/frame at 10,000°F
+    if (ambientF > T_SAND_MELT) {
+      const p = Math.min(0.70, (ambientF - T_SAND_MELT) / 9857);
+      if (rand() < p) {
+        // Above 7,000°F a fraction vaporises directly instead of becoming lava
+        const vaporise = ambientF > 7000 && rand() < (ambientF - 7000) / 10000;
+        grid[i] = vaporise ? SMOKE : LAVA;
+        meta[i] = vaporise ? (rand()*80+40)|0 : 0;
+        colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
+      }
     }
     if (y < H - 1) {
       const dn = idx(x, y + 1);
@@ -166,12 +173,12 @@ function updateCell(x, y) {
 
   // ── Water ─────────────────────────────────────────────────────────────────
   if (mat === WATER) {
-    // Freeze below 32°F
-    if (ambientF < T_FREEZE && rand() < clamp((T_FREEZE - ambientF) / 8000, 0, 0.04)) {
+    // Freeze below 32°F — scales to ~5% chance/frame at 0°F
+    if (ambientF < T_FREEZE && rand() < Math.min(0.05, (T_FREEZE - ambientF) / 640)) {
       setCel(x, y, ICE); processed[i] = 1; return;
     }
-    // Evaporate above 212°F
-    if (ambientF > T_BOIL && rand() < clamp((ambientF - T_BOIL) / 196000, 0, 0.05)) {
+    // Evaporate above 212°F — scales to ~90% chance/frame at 10,000°F
+    if (ambientF > T_BOIL && rand() < Math.min(0.90, (ambientF - T_BOIL) / 10876)) {
       grid[i] = SMOKE; meta[i] = (rand()*60+30)|0; colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
     }
     if (y < H - 1) {
@@ -195,8 +202,8 @@ function updateCell(x, y) {
 
   // ── Oil ───────────────────────────────────────────────────────────────────
   if (mat === OIL) {
-    // Auto-ignition above flash point
-    if (ambientF > T_OIL_FLASH && rand() < clamp((ambientF - T_OIL_FLASH) / 475000, 0, 0.02)) {
+    // Auto-ignition above flash point — scales to ~60% chance/frame at 10,000°F
+    if (ambientF > T_OIL_FLASH && rand() < Math.min(0.60, (ambientF - T_OIL_FLASH) / 15833)) {
       grid[i] = FIRE; meta[i] = (rand()*120+80)|0; colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
     }
     if (y < H - 1) {
@@ -290,9 +297,13 @@ function updateCell(x, y) {
 
   // ── Lava ──────────────────────────────────────────────────────────────────
   if (mat === LAVA) {
-    // Ambient cooling — solidifies without water at low temps
-    if (ambientF < T_LAVA_COOL && rand() < clamp((T_LAVA_COOL - ambientF) / 2600000, 0, 0.005)) {
+    // Ambient cooling — solidifies without water; scales to ~10% chance/frame at 0°F
+    if (ambientF < T_LAVA_COOL && rand() < Math.min(0.10, (T_LAVA_COOL - ambientF) / 13000)) {
       grid[i] = STONE; colorVar[i] = (rand()*255)|0; meta[i] = 0; processed[i] = 1; return;
+    }
+    // At plasma temps lava itself can vaporise
+    if (ambientF > 8000 && rand() < Math.min(0.08, (ambientF - 8000) / 25000)) {
+      grid[i] = SMOKE; meta[i] = (rand()*80+40)|0; colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
     }
 
     // React with all 4 cardinal neighbors
@@ -318,16 +329,18 @@ function updateCell(x, y) {
       }
     }
 
-    // Fall slowly
-    if (y < H - 1 && rand() < 0.45) {
+    // Flow speed scales with temperature — much more fluid at extreme heat
+    const lavaFallProb = Math.min(0.90, 0.45 + ambientF / 22222);
+    const lavaSideProb = Math.min(0.50, 0.12 + ambientF / 26316);
+
+    if (y < H - 1 && rand() < lavaFallProb) {
       const dn = idx(x, y + 1);
       const bt = grid[dn];
       if (bt === AIR || bt === SMOKE || bt === WATER || bt === OIL || bt === SAND) {
         swapCells(i, dn); return;
       }
     }
-    // Slow sideways spread
-    if (rand() < 0.12) {
+    if (rand() < lavaSideProb) {
       const dx = rand() < 0.5 ? 1 : -1;
       const nx = x + dx;
       if (inBounds(nx, y)) {
@@ -378,8 +391,8 @@ function updateCell(x, y) {
 
   // ── Plant ─────────────────────────────────────────────────────────────────
   if (mat === PLANT) {
-    // Auto-ignition above wood/plant burn threshold
-    if (ambientF > T_WOOD_BURN && rand() < clamp((ambientF - T_WOOD_BURN) / 640000, 0, 0.015)) {
+    // Auto-ignition — scales to ~50% chance/frame at 10,000°F
+    if (ambientF > T_WOOD_BURN && rand() < Math.min(0.50, (ambientF - T_WOOD_BURN) / 19040)) {
       grid[i] = FIRE; meta[i] = (rand()*100+60)|0; colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
     }
     // Grow slowly (upward preference)
@@ -397,9 +410,15 @@ function updateCell(x, y) {
 
   // ── Stone ─────────────────────────────────────────────────────────────────
   if (mat === STONE) {
-    // Melts into lava at extreme temps
-    if (ambientF > T_STONE_MELT && rand() < clamp((ambientF - T_STONE_MELT) / 400000, 0, 0.02)) {
-      grid[i] = LAVA; colorVar[i] = (rand()*255)|0; meta[i] = 0; processed[i] = 1; return;
+    // Melt at extreme temps — scales to ~70% chance/frame at 10,000°F
+    if (ambientF > T_STONE_MELT) {
+      const p = Math.min(0.70, (ambientF - T_STONE_MELT) / 11428);
+      if (rand() < p) {
+        const vaporise = ambientF > 7000 && rand() < (ambientF - 7000) / 10000;
+        grid[i] = vaporise ? SMOKE : LAVA;
+        meta[i] = vaporise ? (rand()*80+40)|0 : 0;
+        colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
+      }
     }
     if (y < H - 1) {
       const dn = idx(x, y + 1);
@@ -455,10 +474,11 @@ function updateCell(x, y) {
       }
     }
 
-    // Ambient melt — rate proportional to how far above freezing
-    if (ambientF > T_FREEZE && rand() < clamp((ambientF - T_FREEZE) / 24200, 0, 0.04)) {
+    // Ambient melt — scales to ~95% chance/frame at 10,000°F
+    if (ambientF > T_FREEZE && rand() < Math.min(0.95, (ambientF - T_FREEZE) / 10492)) {
       grid[i]     = ambientF > T_BOIL ? SMOKE : WATER;
-      colorVar[i] = (rand()*255)|0; meta[i] = 0; processed[i] = 1; return;
+      meta[i]     = grid[i] === SMOKE ? (rand()*60+30)|0 : 0;
+      colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
     }
 
     // Freeze adjacent water — faster at lower temps
@@ -477,8 +497,8 @@ function updateCell(x, y) {
 
   // ── Wood ──────────────────────────────────────────────────────────────────
   if (mat === WOOD) {
-    // Auto-ignition at high temps (wood ignition ~480°F)
-    if (ambientF > T_WOOD_BURN && rand() < clamp((ambientF - T_WOOD_BURN) / 1200000, 0, 0.008)) {
+    // Auto-ignition — scales to ~50% chance/frame at 10,000°F
+    if (ambientF > T_WOOD_BURN && rand() < Math.min(0.50, (ambientF - T_WOOD_BURN) / 19040)) {
       grid[i] = FIRE; meta[i] = (rand()*150+80)|0; colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
     }
     return;
@@ -661,11 +681,11 @@ function dismissHelp() {
   setTimeout(() => { el.style.display = 'none'; }, 480);
 }
 
-// Clicking the overlay dismisses it AND starts painting at that position
+// Clicking the overlay only dismisses it — does not start painting
 document.getElementById('help').addEventListener('mousedown', e => {
   e.preventDefault();
+  e.stopPropagation();
   dismissHelp();
-  onPointerDown(e.clientX, e.clientY);
 });
 
 // ─── Keyboard ─────────────────────────────────────────────────────────────────
