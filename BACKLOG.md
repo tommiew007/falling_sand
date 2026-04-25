@@ -2,6 +2,11 @@
 
 ## Physics
 
+**Mass and weight simulation** ⚠ Complicated
+Currently there is no mass model. Density differences are faked via hardcoded movement priority rules — lava can displace water because its fall check lists water as passable, not because a density value is compared. True mass simulation would require per-cell weight values, force accumulation, acceleration vectors, and a summation pass each frame to propagate pressure downward through stacked materials. This would also mean momentum, inertia, and realistic buoyancy. The CPU and architectural cost would be significant, and most of the visual payoff is already approximated by the current priority table. The crushing gravity mechanic (`pressureAbove()`) is a partial workaround — it counts cells, not mass, so a column of iron and a column of sand crush identically.
+
+---
+
 **Thermal diffusion**
 Each cell carries its own temperature rather than reacting to a single global ambient. Heat radiates outward from fire and lava, cold propagates from ice, and phase transitions respond to local conditions instead of the world thermostat. Key design questions: per-cell array type (Uint16 vs Float32), diffusion frequency (every frame vs alternating), and whether air cells participate or simply reset to ambient each tick. Benchmark before committing — memory bandwidth is the primary risk to frame rate.
 
