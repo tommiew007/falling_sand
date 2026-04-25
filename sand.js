@@ -54,6 +54,10 @@ const pixels  = imgData.data;
 let frame  = 0;
 let paused = false;
 
+// ─── Wind ─────────────────────────────────────────────────────────────────────
+// windX: -1 (full left) → 0 (calm) → +1 (full right)
+let windX = 0;
+
 // ─── Ambient temperature ──────────────────────────────────────────────────────
 // Stored internally in Fahrenheit. Range 0–10,000°F.
 let ambientF   = 70;
@@ -233,13 +237,22 @@ function updateCell(x, y) {
       const dn = idx(x, y + 1);
       const bt = grid[dn];
       if (bt === AIR || bt === SMOKE || bt === WATER || bt === OIL) { swapCells(i, dn); return; }
-      const d = rand() < 0.5 ? 1 : -1;
+      // Diagonal: prefer wind direction when wind is active
+      const wdir = windX !== 0 ? Math.sign(windX) : 0;
+      const d = wdir !== 0 && rand() < 0.5 + Math.abs(windX) * 0.35 ? wdir : (rand() < 0.5 ? 1 : -1);
       for (const dx of [d, -d]) {
         const nx = x + dx;
         if (!inBounds(nx, y + 1)) continue;
         const di = idx(nx, y + 1);
         const dt = grid[di];
         if (dt === AIR || dt === SMOKE || dt === WATER || dt === OIL) { swapCells(i, di); return; }
+      }
+    }
+    // Wind erodes resting sand piles laterally
+    if (windX !== 0 && rand() < Math.abs(windX) * 0.10) {
+      const wx = x + Math.sign(windX);
+      if (inBounds(wx, y) && (grid[idx(wx, y)] === AIR || grid[idx(wx, y)] === SMOKE)) {
+        swapCells(i, idx(wx, y)); return;
       }
     }
     return;
@@ -339,15 +352,21 @@ function updateCell(x, y) {
       }
     }
 
-    // Rise upward
+    // Rise upward — wind biases the lateral lean
     if (y > 0 && rand() < 0.5) {
       const up = idx(x, y - 1);
       if (isPassable(grid[up])) { swapCells(i, up); return; }
-      const dx = rand() < 0.5 ? 1 : -1;
+      const wdir = windX !== 0 ? Math.sign(windX) : 0;
+      const dx = wdir !== 0 && rand() < 0.5 + Math.abs(windX) * 0.45 ? wdir : (rand() < 0.5 ? 1 : -1);
       if (inBounds(x + dx, y - 1)) {
         const ui = idx(x + dx, y - 1);
         if (isPassable(grid[ui])) { swapCells(i, ui); return; }
       }
+    }
+    // Wind pushes fire laterally
+    if (windX !== 0 && rand() < Math.abs(windX) * 0.35) {
+      const wx = x + Math.sign(windX);
+      if (inBounds(wx, y) && isPassable(grid[idx(wx, y)])) { swapCells(i, idx(wx, y)); return; }
     }
     return;
   }
@@ -363,7 +382,13 @@ function updateCell(x, y) {
     if (hasEscape) meta[i]--;
     if (meta[i] <= 0) { grid[i] = AIR; processed[i] = 1; return; }
     if (y > 0) {
-      const dx = rand() < 0.3 ? (rand() < 0.5 ? 1 : -1) : 0;
+      // Drift direction biased by wind; stronger wind = more consistent lean
+      const wdir = windX !== 0 ? Math.sign(windX) : 0;
+      const driftChance = 0.3 + Math.abs(windX) * 0.55;
+      let dx = 0;
+      if (rand() < driftChance) {
+        dx = wdir !== 0 && rand() < 0.55 + Math.abs(windX) * 0.40 ? wdir : (rand() < 0.5 ? 1 : -1);
+      }
       const nx = x + dx;
       if (inBounds(nx, y - 1)) {
         const ui = idx(nx, y - 1);
@@ -371,6 +396,11 @@ function updateCell(x, y) {
       }
       const up = idx(x, y - 1);
       if (grid[up] === AIR) { swapCells(i, up); return; }
+    }
+    // Wind pushes smoke sideways even when it can't rise
+    if (windX !== 0 && rand() < Math.abs(windX) * 0.5) {
+      const wx = x + Math.sign(windX);
+      if (inBounds(wx, y) && grid[idx(wx, y)] === AIR) { swapCells(i, idx(wx, y)); return; }
     }
     return;
   }
@@ -967,6 +997,13 @@ MAT_INFO.forEach((m, i) => {
 document.getElementById('sBrush').addEventListener('input', function () {
   brushSize = parseInt(this.value);
   document.getElementById('vBrush').textContent = brushSize;
+});
+
+document.getElementById('sWind').addEventListener('input', function () {
+  windX = parseInt(this.value) / 10;
+  const pct = Math.abs(windX * 100) | 0;
+  document.getElementById('vWind').textContent =
+    windX === 0 ? 'calm' : (windX < 0 ? '← ' : '→ ') + pct + '%';
 });
 document.getElementById('btnClear').addEventListener('click', clearGrid);
 document.getElementById('btnPause').addEventListener('click', togglePause);
