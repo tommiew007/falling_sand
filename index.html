@@ -330,12 +330,15 @@
       inset: 0;
       z-index: 100;
       background: #0a0a0a;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
       text-align: center;
-      font: clamp(14px, 2.5vw, 24px)/1.8 'Courier New', monospace;
+      font-family: 'Courier New', monospace;
+      font-size: clamp(20px, 3.5vw, 36px);
+      line-height: 1.8;
       letter-spacing: 3px;
-      color: #666;
+      color: #aaa;
       padding: 40px;
     }
     #screen-guard.active { display: flex; }
@@ -494,7 +497,7 @@
       </div>
 
       <p class="start-prompt">SPACE OR H TO BEGIN ▶</p>
-      <p style="margin-top:12px;font-size:11px;color:#333;letter-spacing:1px;">Optimized for larger screens in horizontal mode — phones not supported.</p>
+      <p style="margin-top:12px;font-size:12px;color:#555;letter-spacing:1px;">Optimized for larger screens in horizontal mode — phones not supported.</p>
     </div>
   </div>
 </div>
