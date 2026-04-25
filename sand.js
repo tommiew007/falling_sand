@@ -640,11 +640,13 @@ const CHUNKY_MATS = new Set([SAND, STONE, WOOD, ICE, PLANT, LAVA]);
 function paintAt(gx, gy) {
   const r   = brushSize;
   const r2  = r * r;
-  const life = selectedMat === FIRE  ? ((rand() * 100 + 60) | 0)
-             : selectedMat === SMOKE ? ((rand() * 50  + 20) | 0)
+  // Water placed below freezing becomes ice
+  const mat = (selectedMat === WATER && ambientF < T_FREEZE) ? ICE : selectedMat;
+  const life = mat === FIRE  ? ((rand() * 100 + 60) | 0)
+             : mat === SMOKE ? ((rand() * 50  + 20) | 0)
              : 0;
 
-  if (CHUNKY_MATS.has(selectedMat) && brushSize >= 3) {
+  if (CHUNKY_MATS.has(mat) && brushSize >= 3) {
     // Chunk size scales with brush: brush 3-5→2, 6-9→3, 10-14→4, 15+→5
     const cs = Math.min(5, 1 + Math.floor(brushSize / 3));
     const half = cs / 2;
@@ -657,7 +659,7 @@ function paintAt(gx, gy) {
           for (let kx = 0; kx < cs; kx++) {
             const px = gx + dx + kx, py = gy + dy + ky;
             if (!inBounds(px, py)) continue;
-            setCel(px, py, selectedMat, life);
+            setCel(px, py, mat, life);
           }
         }
       }
