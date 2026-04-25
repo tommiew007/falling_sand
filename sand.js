@@ -1145,7 +1145,7 @@ const KEY_MAP = {
 
 window.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveGrid(); return; }
-  if ((e.ctrlKey || e.metaKey) && e.key === 'o') { e.preventDefault(); _fileInput.click(); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'o') { e.preventDefault(); openLoad(); return; }
   if (e.key in KEY_MAP)               { dismissHelp(); selectedMat = KEY_MAP[e.key]; updatePaletteUI(); }
   if (e.key === 'c' || e.key === 'C') { dismissHelp(); clearGrid(); }
   if (e.key === 'p' || e.key === 'P') { dismissHelp(); togglePause(); }
@@ -1299,55 +1299,81 @@ document.getElementById('btnClear').addEventListener('click', clearGrid);
 document.getElementById('btnPause').addEventListener('click', togglePause);
 
 // ─── Save / Load ──────────────────────────────────────────────────────────────
-function saveGrid() {
+function _buildSaveBuf() {
   const size = W * H;
   const buf  = new Uint8Array(8 + size * 2);
-  // Header: magic "SAND" + width (uint16 BE) + height (uint16 BE)
-  buf[0] = 0x53; buf[1] = 0x41; buf[2] = 0x4E; buf[3] = 0x44;
+  buf[0] = 0x53; buf[1] = 0x41; buf[2] = 0x4E; buf[3] = 0x44; // "SAND"
   buf[4] = W >> 8; buf[5] = W & 0xFF;
   buf[6] = H >> 8; buf[7] = H & 0xFF;
   buf.set(grid,     8);
   buf.set(colorVar, 8 + size);
-  const blob = new Blob([buf], { type: 'application/octet-stream' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url; a.download = 'falling_sand.sand'; a.click();
-  URL.revokeObjectURL(url);
+  return buf;
 }
 
-function loadGrid(file) {
-  const reader = new FileReader();
-  reader.onload = e => {
-    const buf = new Uint8Array(e.target.result);
-    if (buf.length < 8) return;
-    if (buf[0] !== 0x53 || buf[1] !== 0x41 || buf[2] !== 0x4E || buf[3] !== 0x44) return;
-    const fw = (buf[4] << 8) | buf[5];
-    const fh = (buf[6] << 8) | buf[7];
-    if (fw !== W || fh !== H) { alert('Save was made at a different grid size and cannot be loaded.'); return; }
-    const size = W * H;
-    grid.set(buf.subarray(8, 8 + size));
-    colorVar.set(buf.subarray(8 + size, 8 + size * 2));
-    meta.fill(0); velX.fill(0); processed.fill(0);
-    // Give transient materials reasonable lifetimes so they don't vanish immediately
-    for (let i = 0; i < size; i++) {
-      if (grid[i] === FIRE)        meta[i] = (rand() * 60  + 40) | 0;
-      if (grid[i] === SMOKE)       meta[i] = (rand() * 40  + 20) | 0;
-      if (grid[i] === ELECTRICITY) meta[i] = (rand() *  4  +  2) | 0;
-    }
-  };
-  reader.readAsArrayBuffer(file);
+function _restoreFromBuf(buf) {
+  if (buf.length < 8) return;
+  if (buf[0] !== 0x53 || buf[1] !== 0x41 || buf[2] !== 0x4E || buf[3] !== 0x44) return;
+  const fw = (buf[4] << 8) | buf[5], fh = (buf[6] << 8) | buf[7];
+  if (fw !== W || fh !== H) { alert('Save was made at a different grid size and cannot be loaded.'); return; }
+  const size = W * H;
+  grid.set(buf.subarray(8, 8 + size));
+  colorVar.set(buf.subarray(8 + size, 8 + size * 2));
+  meta.fill(0); velX.fill(0); processed.fill(0);
+  for (let i = 0; i < size; i++) {
+    if (grid[i] === FIRE)        meta[i] = (rand() * 60 + 40) | 0;
+    if (grid[i] === SMOKE)       meta[i] = (rand() * 40 + 20) | 0;
+    if (grid[i] === ELECTRICITY) meta[i] = (rand() *  4 +  2) | 0;
+  }
 }
 
+// Save — File System Access API shows a "Save As" dialog so the user picks
+// the folder; the browser remembers it for the next open. Falls back to a
+// direct download on browsers that don't support the API (Firefox, Safari).
+async function saveGrid() {
+  const buf = _buildSaveBuf();
+  if (window.showSaveFilePicker) {
+    try {
+      const handle   = await window.showSaveFilePicker({
+        suggestedName: 'falling_sand.sand',
+        types: [{ description: 'Falling Sand save', accept: { 'application/octet-stream': ['.sand'] } }],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(buf);
+      await writable.close();
+    } catch (e) { if (e.name !== 'AbortError') console.error(e); }
+  } else {
+    const url = URL.createObjectURL(new Blob([buf], { type: 'application/octet-stream' }));
+    const a   = document.createElement('a');
+    a.href = url; a.download = 'falling_sand.sand'; a.click();
+    URL.revokeObjectURL(url);
+  }
+}
+
+// Load — same API; the browser reopens the last-used folder automatically.
 const _fileInput = document.createElement('input');
 _fileInput.type = 'file'; _fileInput.accept = '.sand'; _fileInput.style.display = 'none';
 document.body.appendChild(_fileInput);
-_fileInput.addEventListener('change', () => {
-  if (_fileInput.files[0]) loadGrid(_fileInput.files[0]);
-  _fileInput.value = ''; // reset so same file can be re-opened
+_fileInput.addEventListener('change', async () => {
+  if (_fileInput.files[0]) _restoreFromBuf(new Uint8Array(await _fileInput.files[0].arrayBuffer()));
+  _fileInput.value = '';
 });
 
+async function openLoad() {
+  if (window.showOpenFilePicker) {
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        types: [{ description: 'Falling Sand save', accept: { 'application/octet-stream': ['.sand'] } }],
+        multiple: false,
+      });
+      _restoreFromBuf(new Uint8Array(await (await handle.getFile()).arrayBuffer()));
+    } catch (e) { if (e.name !== 'AbortError') console.error(e); }
+  } else {
+    _fileInput.click();
+  }
+}
+
 document.getElementById('btnSave').addEventListener('click', saveGrid);
-document.getElementById('btnLoad').addEventListener('click', () => _fileInput.click());
+document.getElementById('btnLoad').addEventListener('click', openLoad);
 
 // ─── FPS ──────────────────────────────────────────────────────────────────────
 let lastT  = 0;
