@@ -1792,6 +1792,12 @@ function tickFPS(now) {
   }
 }
 
+// ─── Empty-canvas hint ────────────────────────────────────────────────────────
+const emptyHintEl = document.getElementById('empty-hint');
+function updateEmptyHint() {
+  emptyHintEl.classList.toggle('visible', !grid.some(v => v !== 0));
+}
+
 // ─── Main loop ────────────────────────────────────────────────────────────────
 function loop(now) {
   tickFPS(now);
@@ -1802,6 +1808,7 @@ function loop(now) {
     for (let s = 0; s < steps; s++) step();
     render(); // always render for smooth display even at sub-1× speeds
   }
+  updateEmptyHint();
   requestAnimationFrame(loop);
 }
 

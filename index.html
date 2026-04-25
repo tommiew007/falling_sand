@@ -305,6 +305,23 @@
     }
 
     #sTempSlider:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* ── Empty-canvas hint ───────────────────────────────────────────────── */
+    #empty-hint {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 1s;
+      font: clamp(13px, 1.6vw, 20px)/1.7 'Courier New', monospace;
+      letter-spacing: 2px;
+      color: #2a2a2a;
+      text-align: center;
+    }
+    #empty-hint.visible { opacity: 1; }
     .panel-sep { height: 1px; background: #1e1e1e; margin: 2px 0; }
     #btnMusic { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     #btnMusic.on { background: #0a1a2a; color: #4af; border-color: #29f; }
@@ -371,6 +388,7 @@
 
 <div id="viewport">
   <canvas id="canvas"></canvas>
+  <div id="empty-hint">Pick a material, set your environment,<br>and click-drag here</div>
 
   <!-- Help overlay — dismissed on first interaction, H to reopen -->
   <div id="help">
