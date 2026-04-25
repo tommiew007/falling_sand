@@ -559,6 +559,10 @@ function updateCell(x, y) {
       if (nt === STONE && rand() < 0.08) {
         grid[ni] = LAVA; colorVar[ni] = (rand()*255)|0; meta[ni] = 0;
       }
+      // Lava re-liquefies glass — lava (~1,800°F+) exceeds glass softening point (~1,100°F)
+      if (nt === GLASS && rand() < 0.05) {
+        grid[ni] = LAVA; colorVar[ni] = (rand()*255)|0; meta[ni] = 0;
+      }
       // Lava ignites burnables (oil ignites very readily)
       if (isBurnable(nt) && rand() < (nt === OIL ? 0.15 : 0.05)) {
         grid[ni] = FIRE; meta[ni] = (rand()*100+60)|0; colorVar[ni] = (rand()*255)|0;
@@ -1721,7 +1725,7 @@ function _icBuild(mat, x, y) {
       state = T>T_GLASS_MELT ? `⚠ Above melt point (${Ts}) — reverting to lava`
             : gravityStr>=1.6 ? '⚠ Under crushing gravity — fracture risk'
             : 'Stable amorphous solid';
-      if(nr.has(LAVA))  rx.push(['Lava','remelting — above 5,000°F threshold']);
+      if(nr.has(LAVA))  rx.push(['Lava','remelting on contact — lava exceeds glass softening point (~1,100°F)']);
       if(nr.has(ACID))  rx.push(['Acid','no reaction — SiO₂ resists all common acids']);
       if(nr.has(WATER)) rx.push(['Water','no reaction — chemically inert surface']);
       fx=['Formed when sand melts and cools without crystallising',

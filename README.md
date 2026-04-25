@@ -101,6 +101,7 @@ Toggle **°F / °C** at any time. Scroll the temperature slider for fine ±5°F 
 | Iron above 2,800°F | Melts into lava |
 | Acid + Iron | Very slow corrosion (5% of normal dissolve rate) |
 | Sand above 3,100°F | Melts into glass |
+| Lava + Glass | Glass re-liquefies to lava — lava exceeds glass softening point |
 | Glass above 5,000°F | Melts into lava |
 | Acid + Glass | No reaction — glass is acid-resistant |
 | Water below 32°F (painted) | Automatically placed as ice chunks |
