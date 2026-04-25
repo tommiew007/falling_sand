@@ -501,6 +501,12 @@ function updateCell(x, y) {
     if (ambientF > T_WOOD_BURN && rand() < Math.min(0.50, (ambientF - T_WOOD_BURN) / 19040)) {
       grid[i] = FIRE; meta[i] = (rand()*150+80)|0; colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
     }
+    // Falls straight down — rigid solid, doesn't slide diagonally
+    if (y < H - 1) {
+      const dn = idx(x, y + 1);
+      const bt = grid[dn];
+      if (bt === AIR || bt === SMOKE || bt === WATER) { swapCells(i, dn); return; }
+    }
     return;
   }
 }
