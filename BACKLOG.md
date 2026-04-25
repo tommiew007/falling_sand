@@ -23,4 +23,5 @@ Audit what physical variables are currently hardcoded (atmosphere composition, p
 
 ## Architecture
 
-*(nothing yet)*
+**Adaptive frame-rate governor**
+Measure rolling average frame time via `requestAnimationFrame` timestamps. When sustained fps drops below ~45 for ~30 consecutive frames, automatically step the speed multiplier down one notch; restore it when fps recovers above ~58 for ~60 frames. Governs only downward from the user's chosen speed setting, never upward past it. Hysteresis prevents oscillation. Show a subtle `fps↓` badge on the existing fps counter when the governor is active so the user knows why the speed changed. ~40 lines, touches only the main loop and speed display.
