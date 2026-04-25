@@ -306,6 +306,31 @@
 
     .help-box a { color: #555; text-decoration: none; letter-spacing: 1px; transition: color 0.2s; }
     .help-box a:hover { color: #4a9eff; text-decoration: underline; cursor: pointer; }
+
+    /* ── Info card ───────────────────────────────────────────────────────────── */
+    #info-card {
+      position: fixed;
+      z-index: 30;
+      max-width: 262px;
+      background: rgba(8,8,8,0.97);
+      border: 1px solid #242424;
+      border-radius: 5px;
+      padding: 10px 13px 13px;
+      font: 12px/1.65 'Courier New', monospace;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.18s ease;
+      box-shadow: 0 4px 22px rgba(0,0,0,0.65);
+    }
+    #info-card.ic-on { opacity: 1; }
+    .ic-name    { font-size: 15px; font-weight: bold; letter-spacing: 3px; margin-bottom: 2px; }
+    .ic-formula { color: #484848; font-size: 10px; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .ic-state   { color: #999; font-size: 11px; margin-bottom: 2px; }
+    .ic-warn    { color: #ff6644; }
+    .ic-section { color: #383838; font-size: 9px; letter-spacing: 2px; border-top: 1px solid #191919; padding-top: 5px; margin: 7px 0 4px; }
+    .ic-react   { color: #bb7722; font-size: 11px; line-height: 1.55; }
+    .ic-rm      { color: #dd9933; }
+    .ic-fact    { color: #666; font-size: 11px; line-height: 1.55; }
   </style>
 </head>
 <body>
@@ -458,6 +483,7 @@
   </div>
 </div>
 
+<div id="info-card"></div>
 <script src="sand.js"></script>
 </body>
 </html>

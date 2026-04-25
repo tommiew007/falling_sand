@@ -552,8 +552,8 @@ function updateCell(x, y) {
 
   // ── Lava ──────────────────────────────────────────────────────────────────
   if (mat === LAVA) {
-    // Ambient cooling — solidifies without water; scales to ~10% chance/frame at 0°F
-    if (ambientF < T_LAVA_COOL && rand() < Math.min(0.10, (T_LAVA_COOL - ambientF) / 13000)) {
+    // Ambient cooling — solidifies without water; ~0.8% chance/frame at room temp → ~2s per cell
+    if (ambientF < T_LAVA_COOL && rand() < Math.min(0.008, (T_LAVA_COOL - ambientF) / 100000)) {
       grid[i] = STONE; colorVar[i] = (rand()*255)|0; meta[i] = 0; processed[i] = 1; return;
     }
     // At plasma temps lava itself can vaporise
@@ -1096,7 +1096,8 @@ function onPointerMove(clientX, clientY) {
 function onPointerUp() { painting = false; }
 
 canvas.addEventListener('mousedown',  e => { e.preventDefault(); dismissHelp(); onPointerDown(e.clientX, e.clientY); });
-canvas.addEventListener('mousemove',  e => onPointerMove(e.clientX, e.clientY));
+canvas.addEventListener('mousemove',  e => { onPointerMove(e.clientX, e.clientY); if (!painting) _icShow(e.clientX, e.clientY); else _icHide(); });
+canvas.addEventListener('mouseleave', _icDelay);
 window.addEventListener('mouseup',    () => onPointerUp());
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 
@@ -1374,6 +1375,243 @@ async function openLoad() {
 
 document.getElementById('btnSave').addEventListener('click', saveGrid);
 document.getElementById('btnLoad').addEventListener('click', openLoad);
+
+// ─── Info card ────────────────────────────────────────────────────────────────
+const _ic      = document.getElementById('info-card');
+let   _icTimer = null;
+
+// Title colour per material — brighter than swatch so it reads on dark card
+const IC_COL = ['#333','#c8a050','#4a9eff','#ff6622','#33cc33','#aa7755',
+                '#aaaaaa','#cc9922','#999999','#44ff22','#ff8833','#aaddff',
+                '#bbaa88','#88ddff','#cce8ff'];
+
+// Collect distinct non-air materials within a 5×5 neighbourhood
+function _icNear(x, y) {
+  const s = new Set();
+  for (let dy = -2; dy <= 2; dy++)
+    for (let dx = -2; dx <= 2; dx++) {
+      if (!dx && !dy) continue;
+      if (inBounds(x+dx,y+dy)) { const m=grid[idx(x+dx,y+dy)]; if(m!==AIR) s.add(m); }
+    }
+  return s;
+}
+
+// Build innerHTML for the card based on material + current world state
+function _icBuild(mat, x, y) {
+  const nr = _icNear(x, y);
+  const T  = ambientF;
+  const Ts = useCelsius ? `${Math.round((T-32)*5/9)}°C` : `${Math.round(T)}°F`;
+  let formula='', state='', rx=[], fx=[];
+
+  switch (mat) {
+    case SAND:
+      formula='Silicon dioxide · SiO₂';
+      state = T>T_SAND_MELT ? `⚠ Melting to glass at ${Ts}` : 'Stable granular solid';
+      if(nr.has(WATER)) rx.push(['Water','sinking through — SiO₂ denser (2.65 g/cm³)']);
+      if(nr.has(LAVA))  rx.push(['Lava','heat exposure — vitrifying above 3,100°F']);
+      if(nr.has(ACID))  rx.push(['Acid','dissolving silica bonds']);
+      fx=['Most abundant compound on Earth\'s crust',
+          'Melts to amorphous glass above 3,100°F (1,710°C)',
+          'Geological grain size: 0.0625–2 mm by classification'];
+      break;
+    case WATER:
+      formula='Dihydrogen monoxide · H₂O';
+      state = T<T_FREEZE ? `⚠ Below freezing (${Ts}) — crystallizing`
+            : T>T_BOIL   ? `⚠ Above boiling (${Ts}) — evaporating`
+            : `Stable liquid at ${Ts}`;
+      if(nr.has(FIRE))        rx.push(['Fire','quenching combustion']);
+      if(nr.has(LAVA))        rx.push(['Lava','flash-cooling to stone + steam']);
+      if(nr.has(ICE))         rx.push(['Ice','freezing outward from boundary']);
+      if(nr.has(ELECTRICITY)) rx.push(['Electricity','conducting via ion transport']);
+      if(nr.has(OIL))         rx.push(['Oil','oil floating above — immiscible, ~0.8 g/cm³']);
+      fx=['Expands 9% on freezing — one of nature\'s rare anomalies',
+          'Maximum density at 39.2°F (4°C) — why ice floats',
+          'Surface tension 72.8 mN/m — highest of non-metallic liquids'];
+      break;
+    case FIRE:
+      formula='Rapid exothermic oxidation (combustion)';
+      state = T<T_FREEZE ? 'Burning in cold air — quenching faster' : 'Active combustion';
+      if(nr.has(WATER))     rx.push(['Water','extinguishing — H₂O absorbs combustion heat']);
+      if(nr.has(WOOD))      rx.push(['Wood','spreading — cellulose pyrolysis at 480°F']);
+      if(nr.has(OIL))       rx.push(['Oil','igniting hydrocarbons']);
+      if(nr.has(GUNPOWDER)) rx.push(['Gunpowder','⚠ Detonation chain starting']);
+      if(nr.has(ICE))       rx.push(['Ice','melting — absorbing latent heat (334 J/g)']);
+      fx=['Not a material — fire is a chemical reaction',
+          'Colour = temperature: blue (hottest) → white → yellow → orange → red',
+          'Typical wood flame: 1,100–1,500°F (600–800°C)'];
+      break;
+    case PLANT:
+      formula='Cellulose (C₆H₁₀O₅)ₙ + chlorophyll';
+      state = T>T_WOOD_BURN ? `⚠ World above ignition point (${Ts})` : 'Living biomass — growing slowly';
+      if(nr.has(FIRE))  rx.push(['Fire','burning — rapid cellulose oxidation']);
+      if(nr.has(LAVA))  rx.push(['Lava','igniting from radiant heat']);
+      if(nr.has(WATER)) rx.push(['Water','hydrating — supports photosynthesis']);
+      if(nr.has(ACID))  rx.push(['Acid','destroying cell walls']);
+      fx=['Photosynthesis: 6CO₂ + 6H₂O + light → C₆H₁₂O₆ + 6O₂',
+          'Cellulose is the most abundant organic polymer on Earth',
+          'Ignition point ~480°F (249°C) — lower density than wood'];
+      break;
+    case WOOD:
+      formula='Lignin + cellulose + hemicellulose';
+      state = T>T_WOOD_BURN ? `⚠ Above kindling point (${Ts}) — auto-igniting` : 'Dry structural fibre';
+      if(nr.has(FIRE))        rx.push(['Fire','burning — lignocellulose pyrolysis']);
+      if(nr.has(LAVA))        rx.push(['Lava','igniting on direct heat contact']);
+      if(nr.has(ELECTRICITY)) rx.push(['Electricity','arcing — potential ignition']);
+      fx=['Kindling temperature: ~480°F (249°C)',
+          'Density: 0.4–0.9 g/cm³ depending on species',
+          '1 cord of wood ≈ 20 million BTUs of stored energy'];
+      break;
+    case STONE:
+      formula='Silicate minerals · granite / basalt / rhyolite';
+      state = T>T_STONE_MELT ? `⚠ Above melt point (${Ts}) — reverting to lava`
+            : gravityStr>=1.6 ? '⚠ Under crushing gravity — stress fracturing'
+            : 'Solid silicate rock';
+      if(nr.has(LAVA))  rx.push(['Lava','remelting — absorbing magma heat']);
+      if(nr.has(ACID))  rx.push(['Acid','dissolving silicate mineral bonds']);
+      fx=['Melting point: 2,000–2,300°F (1,093–1,260°C) by composition',
+          'Formed via: cooling magma, sedimentation, or metamorphism',
+          'Density: 2.6–3.3 g/cm³ — always sinks in water'];
+      break;
+    case OIL:
+      formula='Hydrocarbons · CₙH₂ₙ₊₂ (alkane series)';
+      state = T>T_OIL_FLASH ? `⚠ Above flash point (${Ts}) — auto-igniting` : 'Stable — floating on water';
+      if(nr.has(FIRE))        rx.push(['Fire','igniting — exothermic hydrocarbon combustion']);
+      if(nr.has(LAVA))        rx.push(['Lava','igniting on radiant heat contact']);
+      if(nr.has(ELECTRICITY)) rx.push(['Electricity','igniting on arc contact']);
+      if(nr.has(WATER))       rx.push(['Water','floating above — immiscible, ~0.8 g/cm³']);
+      fx=['Always floats on water — density ~0.8 vs 1.0 g/cm³',
+          'Flash point varies: crude oil -40°F · diesel +126°F · motor oil +400°F',
+          'Takes ~300–400 million years to form from organic sediment'];
+      break;
+    case SMOKE:
+      formula='Aerosol · CO + CO₂ + H₂O vapour + soot';
+      state = 'Rising — buoyancy from heat differential';
+      if(nr.has(FIRE)) rx.push(['Fire','produced by — incomplete combustion byproduct']);
+      fx=['Particle size: 0.01–10 µm — falls in the PM2.5 hazardous range',
+          'Rises due to buoyancy — less dense than surrounding air',
+          'Enclosed smoke persists — no escape path, no dissipation'];
+      break;
+    case ACID:
+      formula='Strong corrosive acid · modelled as H₂SO₄';
+      state = 'Dissolving contact materials each frame';
+      if(nr.has(STONE)) rx.push(['Stone','dissolving silicate mineral bonds']);
+      if(nr.has(WOOD))  rx.push(['Wood','hydrolyzing cellulose polymer chains']);
+      if(nr.has(WATER)) rx.push(['Water','sinking — density 1.84 vs 1.0 g/cm³']);
+      if(nr.has(ICE))   rx.push(['Ice','dissolving — exothermic acid-ice reaction']);
+      if(nr.has(GLASS)) rx.push(['Glass','no reaction — SiO₂ resists all acids except HF']);
+      fx=['Concentrated H₂SO₄: pH < 0, density 1.84 g/cm³',
+          'Glass resists all common acids — only HF can dissolve SiO₂',
+          'Self-consuming — each reaction depletes the acid cell'];
+      break;
+    case LAVA:
+      formula='Molten basaltic rock · SiO₂ ~50%';
+      state = T<T_LAVA_COOL ? `World below 1,300°F — ambient cooling`
+            : `Flowing at intrinsic ~1,800°F minimum`;
+      if(nr.has(WATER)) rx.push(['Water','quenching — instant stone + steam burst']);
+      if(nr.has(ICE))   rx.push(['Ice','instant vaporization — ΔT ~2,000°F+']);
+      if(nr.has(STONE)) rx.push(['Stone','remelting adjacent silicate rock']);
+      if(nr.has(OIL))   rx.push(['Oil','igniting hydrocarbon on contact']);
+      fx=['Basaltic lava: 1,300–2,200°F (700–1,200°C)',
+          'Flow speed: 0.2–30 mph depending on viscosity and slope',
+          'Emits SO₂, CO₂, HCl, and H₂O while degassing'];
+      break;
+    case ICE:
+      formula='Crystalline H₂O · hexagonal phase Iₕ';
+      state = T>T_BOIL   ? `⚠ Far above melt (${Ts}) — flashing to steam`
+            : T>T_FREEZE ? `⚠ Above melt point (${Ts}) — thawing`
+            : `Stable at ${Ts} — nucleating adjacent water`;
+      if(nr.has(LAVA))        rx.push(['Lava','instant vaporization — extreme thermal shock']);
+      if(nr.has(FIRE))        rx.push(['Fire','melting — absorbing latent heat (334 J/g)']);
+      if(nr.has(WATER))       rx.push(['Water','slowly freezing outward via nucleation']);
+      if(nr.has(ELECTRICITY)) rx.push(['Electricity','cracking crystal lattice on arc']);
+      fx=['Density 0.917 g/cm³ — floats on water (rare property in nature)',
+          'Latent heat 334 J/g — enormous energy required to melt',
+          'Freezes outward via crystal nucleation from existing ice'];
+      break;
+    case GUNPOWDER:
+      formula='KNO₃ 75% · Charcoal 15% · Sulfur 10%';
+      state = T>T_WOOD_BURN ? `⚠ Above auto-ignition threshold (${Ts})`
+            : 'Stable — awaiting ignition source';
+      if(nr.has(FIRE))        rx.push(['Fire','⚠ Detonating — deflagration chain']);
+      if(nr.has(LAVA))        rx.push(['Lava','⚠ Igniting from radiant heat']);
+      if(nr.has(ELECTRICITY)) rx.push(['Electricity','⚠ Instant detonation on arc']);
+      if(nr.has(WATER))       rx.push(['Water','desensitizing — wet powder won\'t fire']);
+      fx=['Invented in Tang Dynasty China, ~9th century AD',
+          'Burns at ~3,300°F — generates 1,000× its volume in gas instantly',
+          'Deflagrates (fast subsonic burn), not detonates, unless confined'];
+      break;
+    case ELECTRICITY:
+      formula='Arc discharge · directed electron flow';
+      state = 'Transient — decaying each frame';
+      if(nr.has(WATER))       rx.push(['Water','conducting — ion transport through H₂O']);
+      if(nr.has(ACID))        rx.push(['Acid','conducting — high ion concentration']);
+      if(nr.has(OIL))         rx.push(['Oil','igniting on arc contact']);
+      if(nr.has(GUNPOWDER))   rx.push(['Gunpowder','⚠ Instant detonation']);
+      if(nr.has(ICE))         rx.push(['Ice','cracking — arc shatters crystal lattice']);
+      fx=['Lightning bolt: ~30,000°F — hotter than the sun\'s surface',
+          'Travels at ~2/3 the speed of light through conductors',
+          'Branching follows the path of least resistance (Lichtenberg pattern)'];
+      break;
+    case GLASS:
+      formula='Amorphous silicon dioxide · SiO₂';
+      state = T>T_GLASS_MELT ? `⚠ Above melt point (${Ts}) — reverting to lava`
+            : gravityStr>=1.6 ? '⚠ Under crushing gravity — fracture risk'
+            : 'Stable amorphous solid';
+      if(nr.has(LAVA))  rx.push(['Lava','remelting — above 5,000°F threshold']);
+      if(nr.has(ACID))  rx.push(['Acid','no reaction — SiO₂ resists all common acids']);
+      if(nr.has(WATER)) rx.push(['Water','no reaction — chemically inert surface']);
+      fx=['Formed when sand melts and cools without crystallising',
+          'Amorphous — atoms lack long-range order (not technically a solid)',
+          'Glass transition ~1,100°F (593°C) — softens before melting',
+          'Only HF acid can dissolve SiO₂ — all others bounce off'];
+      break;
+  }
+
+  const col  = IC_COL[mat];
+  const name = MAT_INFO[mat].name.toUpperCase();
+  let h = `<div class="ic-name" style="color:${col}">${name}</div>`;
+  h += `<div class="ic-formula">${formula}</div>`;
+  if (state) {
+    const warn = state.startsWith('⚠') ? ' ic-warn' : '';
+    h += `<div class="ic-state${warn}">${state}</div>`;
+  }
+  if (rx.length) {
+    h += `<div class="ic-section">REACTING WITH</div>`;
+    rx.slice(0, 3).forEach(([m, d]) => {
+      h += `<div class="ic-react"><span class="ic-rm">${m}</span> — ${d}</div>`;
+    });
+  }
+  if (fx.length) {
+    h += `<div class="ic-section">SCIENCE</div>`;
+    fx.slice(0, 4).forEach(f => { h += `<div class="ic-fact">${f}</div>`; });
+  }
+  return h;
+}
+
+function _icShow(cx, cy) {
+  const g   = toGrid(cx, cy);
+  const mat = grid[idx(g.x, g.y)];
+
+  clearTimeout(_icTimer); _icTimer = null;
+
+  if (mat === AIR || !helpDismissed) { _icHide(); return; }
+
+  _ic.classList.remove('ic-on');
+  _ic.innerHTML = _icBuild(mat, g.x, g.y);
+  void _ic.offsetWidth; // flush reflow so transition fires cleanly
+
+  // Position right+below cursor; flip if near window edge
+  const CW = 270;
+  let lx = cx + 16, ly = cy + 16;
+  if (lx + CW > window.innerWidth  - 6) lx = cx - CW - 6;
+  if (ly       > window.innerHeight - 310) ly = Math.max(6, cy - 320);
+  _ic.style.left = Math.max(4, lx) + 'px';
+  _ic.style.top  = Math.max(4, ly) + 'px';
+  _ic.classList.add('ic-on');
+}
+
+function _icHide()  { _ic.classList.remove('ic-on'); }
+function _icDelay() { if (!_icTimer) _icTimer = setTimeout(_icHide, 2000); }
 
 // ─── FPS ──────────────────────────────────────────────────────────────────────
 let lastT  = 0;
