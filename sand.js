@@ -62,6 +62,29 @@ let paused = false;
 // windX: -1 (full left) → 0 (calm) → +1 (full right)
 let windX = 0;
 
+// ─── Gravity ──────────────────────────────────────────────────────────────────
+// 0 = off (nothing falls), 1 = normal, 2 = crushing
+let gravityStr = 1.0;
+
+// Returns true when gravity permits a downward move this frame.
+// Below 1.0: probabilistic (floaty). At or above 1.0: always true.
+function gravCheck() {
+  if (gravityStr <= 0) return false;
+  if (gravityStr >= 1) return true;
+  return rand() < gravityStr;
+}
+
+// Count non-air cells directly above (x,y) up to depth 6 — used for crush.
+function pressureAbove(x, y) {
+  let p = 0;
+  for (let py = y - 1; py >= Math.max(0, y - 6); py--) {
+    const m = grid[idx(x, py)];
+    if (m === AIR || m === SMOKE || m === FIRE) break;
+    p++;
+  }
+  return p;
+}
+
 // ─── Ambient temperature ──────────────────────────────────────────────────────
 // Stored internally in Fahrenheit. Range 0–10,000°F.
 let ambientF   = 70;
@@ -313,7 +336,7 @@ function updateCell(x, y) {
         colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
       }
     }
-    if (y < H - 1) {
+    if (gravCheck() && y < H - 1) {
       const dn = idx(x, y + 1);
       const bt = grid[dn];
       if (bt === AIR || bt === SMOKE || bt === WATER || bt === OIL) { swapCells(i, dn); return; }
@@ -348,20 +371,22 @@ function updateCell(x, y) {
     if (ambientF > T_BOIL && rand() < Math.min(0.90, (ambientF - T_BOIL) / 10876)) {
       grid[i] = SMOKE; meta[i] = (rand()*60+30)|0; colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
     }
-    if (y < H - 1) {
+    if (gravCheck() && y < H - 1) {
       const dn = idx(x, y + 1);
       const bt = grid[dn];
       if (isPassable(bt) || bt === OIL) { swapCells(i, dn); return; }
     }
-    const d      = rand() < 0.5 ? 1 : -1;
-    const spread = 4 + randInt(4);
-    for (const dir of [d, -d]) {
-      for (let s = 1; s <= spread; s++) {
-        const nx = x + dir * s;
-        if (!inBounds(nx, y)) break;
-        const ni = idx(nx, y);
-        if (grid[ni] === AIR) { swapCells(i, ni); return; }
-        if (grid[ni] !== WATER) break;
+    if (gravityStr > 0) {
+      const d      = rand() < 0.5 ? 1 : -1;
+      const spread = 4 + randInt(4);
+      for (const dir of [d, -d]) {
+        for (let s = 1; s <= spread; s++) {
+          const nx = x + dir * s;
+          if (!inBounds(nx, y)) break;
+          const ni = idx(nx, y);
+          if (grid[ni] === AIR) { swapCells(i, ni); return; }
+          if (grid[ni] !== WATER) break;
+        }
       }
     }
     return;
@@ -373,19 +398,21 @@ function updateCell(x, y) {
     if (ambientF > T_OIL_FLASH && rand() < Math.min(0.60, (ambientF - T_OIL_FLASH) / 15833)) {
       grid[i] = FIRE; meta[i] = (rand()*120+80)|0; colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
     }
-    if (y < H - 1) {
+    if (gravCheck() && y < H - 1) {
       const dn = idx(x, y + 1);
       if (isPassable(grid[dn])) { swapCells(i, dn); return; }
     }
-    const d      = rand() < 0.5 ? 1 : -1;
-    const spread = 2 + randInt(3);
-    for (const dir of [d, -d]) {
-      for (let s = 1; s <= spread; s++) {
-        const nx = x + dir * s;
-        if (!inBounds(nx, y)) break;
-        const ni = idx(nx, y);
-        if (grid[ni] === AIR) { swapCells(i, ni); return; }
-        if (grid[ni] !== OIL) break;
+    if (gravityStr > 0) {
+      const d      = rand() < 0.5 ? 1 : -1;
+      const spread = 2 + randInt(3);
+      for (const dir of [d, -d]) {
+        for (let s = 1; s <= spread; s++) {
+          const nx = x + dir * s;
+          if (!inBounds(nx, y)) break;
+          const ni = idx(nx, y);
+          if (grid[ni] === AIR) { swapCells(i, ni); return; }
+          if (grid[ni] !== OIL) break;
+        }
       }
     }
     return;
@@ -434,7 +461,7 @@ function updateCell(x, y) {
     }
 
     // Rise upward — wind biases the lateral lean
-    if (y > 0 && rand() < 0.5) {
+    if (gravityStr > 0 && y > 0 && rand() < 0.5) {
       const up = idx(x, y - 1);
       if (isPassable(grid[up])) { swapCells(i, up); return; }
       const wdir = windX !== 0 ? Math.sign(windX) : 0;
@@ -463,7 +490,7 @@ function updateCell(x, y) {
     );
     if (hasEscape) meta[i]--;
     if (meta[i] <= 0) { grid[i] = AIR; processed[i] = 1; return; }
-    if (y > 0) {
+    if (gravityStr > 0 && y > 0) {
       // Drift direction biased by wind; stronger wind = more consistent lean
       const wdir = windX !== 0 ? Math.sign(windX) : 0;
       const driftChance = 0.3 + Math.abs(windX) * 0.55;
@@ -527,14 +554,14 @@ function updateCell(x, y) {
     const lavaFallProb = Math.min(0.90, 0.45 + lavaTemp / 22222);
     const lavaSideProb = Math.min(0.50, 0.12 + lavaTemp / 26316);
 
-    if (y < H - 1 && rand() < lavaFallProb) {
+    if (gravCheck() && y < H - 1 && rand() < lavaFallProb) {
       const dn = idx(x, y + 1);
       const bt = grid[dn];
       if (bt === AIR || bt === SMOKE || bt === WATER || bt === OIL || bt === SAND) {
         swapCells(i, dn); return;
       }
     }
-    if (rand() < lavaSideProb) {
+    if (gravityStr > 0 && rand() < lavaSideProb) {
       const dx = rand() < 0.5 ? 1 : -1;
       const nx = x + dx;
       if (inBounds(nx, y)) {
@@ -564,20 +591,22 @@ function updateCell(x, y) {
       }
     }
     // Acid is denser than water — sinks through it
-    if (y < H - 1) {
+    if (gravCheck() && y < H - 1) {
       const dn = idx(x, y + 1);
       const bt = grid[dn];
       if (isPassable(bt) || bt === WATER) { swapCells(i, dn); return; }
     }
-    const d      = rand() < 0.5 ? 1 : -1;
-    const spread = 2 + randInt(3);
-    for (const dir of [d, -d]) {
-      for (let s = 1; s <= spread; s++) {
-        const nx = x + dir * s;
-        if (!inBounds(nx, y)) break;
-        const ni = idx(nx, y);
-        if (grid[ni] === AIR) { swapCells(i, ni); return; }
-        if (grid[ni] !== ACID) break;
+    if (gravityStr > 0) {
+      const d      = rand() < 0.5 ? 1 : -1;
+      const spread = 2 + randInt(3);
+      for (const dir of [d, -d]) {
+        for (let s = 1; s <= spread; s++) {
+          const nx = x + dir * s;
+          if (!inBounds(nx, y)) break;
+          const ni = idx(nx, y);
+          if (grid[ni] === AIR) { swapCells(i, ni); return; }
+          if (grid[ni] !== ACID) break;
+        }
       }
     }
     return;
@@ -590,7 +619,7 @@ function updateCell(x, y) {
       grid[i] = FIRE; meta[i] = (rand()*100+60)|0; colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
     }
     // Falls straight down when unsupported
-    if (y < H - 1) {
+    if (gravCheck() && y < H - 1) {
       const dn = idx(x, y + 1);
       const bt = grid[dn];
       if (bt === AIR || bt === SMOKE || bt === WATER) { swapCells(i, dn); return; }
@@ -620,7 +649,7 @@ function updateCell(x, y) {
         colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
       }
     }
-    if (y < H - 1) {
+    if (gravCheck() && y < H - 1) {
       const dn = idx(x, y + 1);
       const bt = grid[dn];
       if (bt === AIR || bt === SMOKE || bt === WATER) { swapCells(i, dn); return; }
@@ -633,13 +662,20 @@ function updateCell(x, y) {
         if (dt === AIR || dt === SMOKE || dt === WATER) { swapCells(i, di); return; }
       }
     }
+    // Crushing gravity — stone crumbles to sand under pressure
+    if (gravityStr >= 1.6 && !processed[i]) {
+      const pressure = pressureAbove(x, y);
+      if (pressure > 0 && rand() < (gravityStr - 1.6) * 0.005 + pressure * 0.0008) {
+        grid[i] = SAND; colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
+      }
+    }
     return;
   }
 
   // ── Ice ───────────────────────────────────────────────────────────────────
   if (mat === ICE) {
     // Fall like sand
-    if (y < H - 1) {
+    if (gravCheck() && y < H - 1) {
       const dn = idx(x, y + 1);
       const bt = grid[dn];
       if (bt === AIR || bt === SMOKE || bt === WATER) { swapCells(i, dn); return; }
@@ -692,6 +728,13 @@ function updateCell(x, y) {
         if (grid[idx(nx,ny)] === WATER) { setCel(nx, ny, ICE); break; }
       }
     }
+    // Crushing gravity — ice cracks to water under heavy columns
+    if (gravityStr >= 1.6 && !processed[i]) {
+      const pressure = pressureAbove(x, y);
+      if (pressure > 1 && rand() < (gravityStr - 1.6) * 0.006 + pressure * 0.001) {
+        grid[i] = WATER; colorVar[i] = (rand()*255)|0; meta[i] = 0; processed[i] = 1; return;
+      }
+    }
     return;
   }
 
@@ -733,7 +776,7 @@ function updateCell(x, y) {
       }
     }
     // Gravity — falls and piles like sand, sinks through liquids
-    if (y < H - 1) {
+    if (gravCheck() && y < H - 1) {
       const dn = idx(x, y + 1);
       const bt = grid[dn];
       if (bt === AIR || bt === SMOKE || bt === WATER || bt === OIL) { swapCells(i, dn); return; }
@@ -760,7 +803,7 @@ function updateCell(x, y) {
       }
     }
     // Falls and piles like stone
-    if (y < H - 1) {
+    if (gravCheck() && y < H - 1) {
       const dn = idx(x, y + 1);
       const bt = grid[dn];
       if (bt === AIR || bt === SMOKE || bt === WATER || bt === OIL) { swapCells(i, dn); return; }
@@ -773,6 +816,13 @@ function updateCell(x, y) {
         if (dt === AIR || dt === SMOKE || dt === WATER || dt === OIL) { swapCells(i, di); return; }
       }
     }
+    // Crushing gravity — glass shatters under heavy columns
+    if (gravityStr >= 1.6 && !processed[i]) {
+      const pressure = pressureAbove(x, y);
+      if (pressure > 1 && rand() < (gravityStr - 1.6) * 0.008 + pressure * 0.0012) {
+        grid[i] = AIR; processed[i] = 1; return;
+      }
+    }
     return;
   }
 
@@ -783,7 +833,7 @@ function updateCell(x, y) {
       grid[i] = FIRE; meta[i] = (rand()*150+80)|0; colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
     }
     // Falls straight down — rigid solid, doesn't slide diagonally
-    if (y < H - 1) {
+    if (gravCheck() && y < H - 1) {
       const dn = idx(x, y + 1);
       const bt = grid[dn];
       if (bt === AIR || bt === SMOKE || bt === WATER) { swapCells(i, dn); return; }
@@ -1171,6 +1221,21 @@ document.getElementById('sWind').addEventListener('input', function () {
   const pct = Math.abs(windX * 100) | 0;
   document.getElementById('vWind').textContent =
     windX === 0 ? 'calm' : (windX < 0 ? '← ' : '→ ') + pct + '%';
+});
+
+function gravDesc(v) {
+  if (v <= 0)    return 'none';
+  if (v <= 0.4)  return 'light';
+  if (v <= 0.8)  return 'low';
+  if (v <= 1.15) return 'normal';
+  if (v <= 1.4)  return 'strong';
+  if (v <= 1.8)  return 'heavy';
+  return 'crushing';
+}
+
+document.getElementById('sGrav').addEventListener('input', function () {
+  gravityStr = parseInt(this.value) / 5;
+  document.getElementById('vGrav').textContent = gravDesc(gravityStr);
 });
 document.getElementById('btnClear').addEventListener('click', clearGrid);
 document.getElementById('btnPause').addEventListener('click', togglePause);
