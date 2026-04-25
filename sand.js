@@ -280,7 +280,13 @@ function updateCell(x, y) {
 
   // ── Smoke ─────────────────────────────────────────────────────────────────
   if (mat === SMOKE) {
-    meta[i]--;
+    // Only age smoke when it has somewhere to escape — trapped smoke persists
+    const hasEscape = (
+      (y > 0     && (grid[idx(x, y-1)] === AIR || (x > 0     && grid[idx(x-1, y-1)] === AIR) || (x < W-1 && grid[idx(x+1, y-1)] === AIR))) ||
+      (x > 0     && grid[idx(x-1, y)] === AIR) ||
+      (x < W - 1 && grid[idx(x+1, y)] === AIR)
+    );
+    if (hasEscape) meta[i]--;
     if (meta[i] <= 0) { grid[i] = AIR; processed[i] = 1; return; }
     if (y > 0) {
       const dx = rand() < 0.3 ? (rand() < 0.5 ? 1 : -1) : 0;
