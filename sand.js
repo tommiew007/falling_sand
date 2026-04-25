@@ -1336,12 +1336,24 @@ document.getElementById('btnPause').addEventListener('click', togglePause);
 // ─── Save / Load ──────────────────────────────────────────────────────────────
 function _buildSaveBuf() {
   const size = W * H;
-  const buf  = new Uint8Array(8 + size * 2);
+  // 8-byte header + grid + colorVar + 10-byte UI state block (version 2)
+  const buf = new Uint8Array(8 + size * 2 + 10);
   buf[0] = 0x53; buf[1] = 0x41; buf[2] = 0x4E; buf[3] = 0x44; // "SAND"
   buf[4] = W >> 8; buf[5] = W & 0xFF;
   buf[6] = H >> 8; buf[7] = H & 0xFF;
   buf.set(grid,     8);
   buf.set(colorVar, 8 + size);
+  const ui = 8 + size * 2;
+  buf[ui + 0] = 2;                                           // version marker
+  buf[ui + 1] = (Math.round(ambientF) >> 8) & 0xFF;         // ambientF high byte
+  buf[ui + 2] =  Math.round(ambientF)       & 0xFF;         // ambientF low byte
+  buf[ui + 3] = Math.round(windX * 10) + 10;                // wind −10..+10 → 0..20
+  buf[ui + 4] = Math.round(gravityStr * 5);                 // grav slider 0..10
+  buf[ui + 5] = Math.max(0, SPEED_STEPS.indexOf(speedMult)); // speed index 0..4
+  buf[ui + 6] = brushSize;                                   // brush 1..20
+  buf[ui + 7] = (infernoOn ? 1 : 0) | (useCelsius ? 2 : 0); // flags
+  buf[ui + 8] = musicIdx + 1;                               // music −1..3 → 0..4
+  buf[ui + 9] = selectedMat;                                // selected material 0..14
   return buf;
 }
 
@@ -1358,6 +1370,43 @@ function _restoreFromBuf(buf) {
     if (grid[i] === FIRE)        meta[i] = (rand() * 60 + 40) | 0;
     if (grid[i] === SMOKE)       meta[i] = (rand() * 40 + 20) | 0;
     if (grid[i] === ELECTRICITY) meta[i] = (rand() *  4 +  2) | 0;
+  }
+  // Restore UI state if v2 block is present
+  const ui = 8 + size * 2;
+  if (buf.length >= ui + 10 && buf[ui] === 2) {
+    ambientF   = (buf[ui + 1] << 8) | buf[ui + 2];
+    windX      = (buf[ui + 3] - 10) / 10;
+    gravityStr = buf[ui + 4] / 5;
+    const si   = Math.min(buf[ui + 5], SPEED_STEPS.length - 1);
+    speedMult  = SPEED_STEPS[si]; speedAccum = 0;
+    brushSize  = Math.max(1, Math.min(20, buf[ui + 6]));
+    const flags = buf[ui + 7];
+    infernoOn  = !!(flags & 1);
+    useCelsius = !!(flags & 2);
+    musicIdx   = buf[ui + 8] - 1;
+    selectedMat = Math.min(buf[ui + 9], GLASS);
+
+    // Sync all UI widgets to restored state
+    infernoOn
+      ? (document.getElementById('btnInferno').classList.add('on'), sliderEl.disabled = true)
+      : (document.getElementById('btnInferno').classList.remove('on'), sliderEl.disabled = false, syncSlider());
+    updateTempDisplay();
+    document.getElementById('btnUnit').textContent = useCelsius ? '°F' : '°C';
+
+    const windRaw = Math.round(windX * 10);
+    document.getElementById('sWind').value = windRaw;
+    document.getElementById('vWind').textContent = windX === 0 ? 'calm'
+      : (windX < 0 ? '← ' : '→ ') + Math.abs(windRaw) + '%';
+
+    document.getElementById('sGrav').value = buf[ui + 4];
+    document.getElementById('vGrav').textContent = gravDesc(gravityStr);
+
+    document.getElementById('sSpeed').value = si + 1;
+    document.getElementById('vSpeed').textContent = SPEED_LABELS[si];
+
+    updateBrushUI();
+    _musicUpdate();
+    updatePaletteUI();
   }
 }
 
