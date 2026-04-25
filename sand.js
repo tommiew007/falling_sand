@@ -971,21 +971,31 @@ window.addEventListener('touchend',   () => onPointerUp());
 
 // ─── Help overlay ─────────────────────────────────────────────────────────────
 let helpDismissed = false;
+const helpEl = document.getElementById('help');
 
 function dismissHelp() {
   if (helpDismissed) return;
   helpDismissed = true;
-  const el = document.getElementById('help');
-  el.style.pointerEvents = 'none'; // pass events to canvas immediately
-  el.classList.add('fading');
-  setTimeout(() => { el.style.display = 'none'; }, 480);
+  helpEl.style.pointerEvents = 'none';
+  helpEl.classList.add('fading');
+  setTimeout(() => { helpEl.style.display = 'none'; }, 480);
+}
+
+function showHelp() {
+  if (!paused) togglePause();
+  helpEl.style.display = 'flex';
+  helpEl.style.opacity = '1';
+  helpEl.classList.remove('fading');
+  helpEl.style.pointerEvents = 'auto';
+  helpDismissed = false;
 }
 
 // Clicking the overlay only dismisses it — does not start painting
-document.getElementById('help').addEventListener('mousedown', e => {
+helpEl.addEventListener('mousedown', e => {
   e.preventDefault();
   e.stopPropagation();
   dismissHelp();
+  if (paused) togglePause();
 });
 
 // ─── Keyboard ─────────────────────────────────────────────────────────────────
@@ -1000,6 +1010,7 @@ window.addEventListener('keydown', e => {
   if (e.key in KEY_MAP)               { dismissHelp(); selectedMat = KEY_MAP[e.key]; updatePaletteUI(); }
   if (e.key === 'c' || e.key === 'C') { dismissHelp(); clearGrid(); }
   if (e.key === 'p' || e.key === 'P') { dismissHelp(); togglePause(); }
+  if (e.key === 'h' || e.key === 'H') { showHelp(); }
   if (e.key === '[') { brushSize = Math.max(1,  brushSize - 1); updateBrushUI(); }
   if (e.key === ']') { brushSize = Math.min(20, brushSize + 1); updateBrushUI(); }
 });
