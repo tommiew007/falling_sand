@@ -1050,8 +1050,18 @@ function fitCanvas() {
   canvas.style.height = (H * scale) + 'px';
 }
 
+// ─── Screen-size guard ────────────────────────────────────────────────────────
+const screenGuardEl = document.getElementById('screen-guard');
+
+function checkScreenGuard() {
+  const bad = window.innerWidth < 768 || window.innerWidth <= window.innerHeight;
+  screenGuardEl.classList.toggle('active', bad);
+}
+
 fitCanvas();
-window.addEventListener('resize', fitCanvas);
+checkScreenGuard();
+window.addEventListener('resize', () => { fitCanvas(); checkScreenGuard(); });
+window.addEventListener('orientationchange', checkScreenGuard);
 
 // ─── Mouse / Touch painting ───────────────────────────────────────────────────
 let selectedMat = SAND;

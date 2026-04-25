@@ -322,6 +322,23 @@
       text-align: center;
     }
     #empty-hint.visible { opacity: 1; }
+
+    /* ── Screen-size guard ───────────────────────────────────────────────── */
+    #screen-guard {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: #0a0a0a;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font: clamp(14px, 2.5vw, 24px)/1.8 'Courier New', monospace;
+      letter-spacing: 3px;
+      color: #666;
+      padding: 40px;
+    }
+    #screen-guard.active { display: flex; }
     .panel-sep { height: 1px; background: #1e1e1e; margin: 2px 0; }
     #btnMusic { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     #btnMusic.on { background: #0a1a2a; color: #4af; border-color: #29f; }
@@ -372,6 +389,8 @@
   </style>
 </head>
 <body>
+
+<div id="screen-guard">Optimized for larger screens<br>in horizontal mode.</div>
 
 <div id="main-area">
 <div id="left-panel">
@@ -475,6 +494,7 @@
       </div>
 
       <p class="start-prompt">SPACE OR H TO BEGIN ▶</p>
+      <p style="margin-top:12px;font-size:11px;color:#333;letter-spacing:1px;">Optimized for larger screens in horizontal mode — phones not supported.</p>
     </div>
   </div>
 </div>

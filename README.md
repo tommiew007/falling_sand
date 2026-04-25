@@ -6,6 +6,8 @@ A browser-based particle physics sandbox with 16 interactive materials, wind, te
 
 **Live demo:** https://tommiew007.github.io/falling_sand/
 
+> **Requires a larger screen in landscape orientation.** Phones are not supported — the app will display a warning and block interaction on small or portrait-mode screens (minimum 768px wide, width must exceed height).
+
 ![Falling Sand](https://img.shields.io/badge/built%20with-vanilla%20JS-yellow) ![License](https://img.shields.io/badge/license-MIT-blue)
 
 ---
