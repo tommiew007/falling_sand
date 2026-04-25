@@ -177,16 +177,16 @@
     .mat-btn.selected { border-color: #aaa; background: #1e1e1e; }
 
     .swatch {
-      width: 14px;
-      height: 14px;
+      width: 16px;
+      height: 16px;
       border-radius: 2px;
       border: 1px solid rgba(255,255,255,0.15);
       flex-shrink: 0;
     }
 
-    .mat-btn .mat-name { color: #ccc; font-size: 13px; flex: 1; }
+    .mat-btn .mat-name { color: #ccc; font-size: 15px; flex: 1; }
     .mat-btn.selected .mat-name { color: #fff; }
-    .mat-btn .mat-key  { color: #555; font-size: 11px; }
+    .mat-btn .mat-key  { color: #555; font-size: 12px; }
     .mat-btn.selected .mat-key { color: #888; }
 
     /* ── Bottom bar ──────────────────────────────────────────────────────── */
@@ -218,14 +218,16 @@
       font-size: 11px;
     }
 
-    .ctrl-group label { color: #999; font-size: 12px; }
-    .ctrl-group span  { color: #bbb; min-width: 14px; font-size: 12px; }
+    .ctrl-group label { color: #aaa; font-size: 13px; }
+    .ctrl-group span  { color: #ccc; min-width: 18px; font-size: 13px; }
 
     input[type=range] {
-      width: 55px;
+      width: 60px;
       accent-color: #888;
       cursor: pointer;
     }
+
+    #sWind { width: 110px; }
 
     /* ── Temperature slider ──────────────────────────────────────────────── */
     #temp-wrap {
@@ -241,8 +243,8 @@
       line-height: 1.2;
     }
 
-    #tempVal  { font-size: 15px; font-weight: bold; color: #ccc; white-space: nowrap; min-width: 68px; text-align: right; transition: color 0.4s; }
-    #tempDesc { font-size: 10px; color: #777; letter-spacing: 1px; transition: color 0.4s; }
+    #tempVal  { font-size: 17px; font-weight: bold; color: #ccc; white-space: nowrap; min-width: 76px; text-align: right; transition: color 0.4s; }
+    #tempDesc { font-size: 11px; color: #888; letter-spacing: 1px; transition: color 0.4s; }
 
     /* gradient-backed range track — stops aligned to the piecewise curve breakpoints */
     #sTempSlider {
@@ -286,14 +288,14 @@
       cursor: pointer;
     }
 
-    #fps { color: #666; font-size: 12px; white-space: nowrap; }
+    #fps { color: #777; font-size: 13px; white-space: nowrap; }
 
     button {
       background: #1a1a1a;
-      color: #999;
-      border: 1px solid #2a2a2a;
-      padding: 4px 9px;
-      font: 12px 'Courier New', monospace;
+      color: #aaa;
+      border: 1px solid #333;
+      padding: 5px 11px;
+      font: 13px 'Courier New', monospace;
       cursor: pointer;
       border-radius: 3px;
       white-space: nowrap;
