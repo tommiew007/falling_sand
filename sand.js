@@ -106,6 +106,7 @@ const T_BOIL       =  212;   // water → steam
 const T_OIL_FLASH  =  500;   // oil auto-ignites
 const T_WOOD_BURN  =  480;   // wood / plant auto-ignites
 const T_LAVA_COOL  = 1300;   // lava solidifies without water below this
+const T_LAVA_INTRINSIC = 1800; // lava's own heat — used for flow/reactions regardless of ambient
 const T_STONE_MELT = 2000;   // stone → lava
 const T_SAND_MELT  = 3100;   // sand → lava (silica melting point)
 
@@ -336,8 +337,10 @@ function updateCell(x, y) {
     }
 
     // Flow speed scales with temperature — much more fluid at extreme heat
-    const lavaFallProb = Math.min(0.90, 0.45 + ambientF / 22222);
-    const lavaSideProb = Math.min(0.50, 0.12 + ambientF / 26316);
+    // Lava flows at its own heat; ambient only controls how fast it solidifies
+    const lavaTemp     = Math.max(ambientF, T_LAVA_INTRINSIC);
+    const lavaFallProb = Math.min(0.90, 0.45 + lavaTemp / 22222);
+    const lavaSideProb = Math.min(0.50, 0.12 + lavaTemp / 26316);
 
     if (y < H - 1 && rand() < lavaFallProb) {
       const dn = idx(x, y + 1);
