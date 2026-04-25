@@ -1028,6 +1028,7 @@ function showHelp() {
 
 // Clicking the overlay only dismisses it — does not start painting
 helpEl.addEventListener('mousedown', e => {
+  if (e.target.closest('a')) return; // let links open normally
   e.preventDefault();
   e.stopPropagation();
   dismissHelp();
