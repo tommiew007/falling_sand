@@ -51,6 +51,7 @@ const grid      = new Uint8Array(W * H);
 const colorVar  = new Uint8Array(W * H);
 const meta      = new Uint16Array(W * H);
 const processed = new Uint8Array(W * H);
+const velX      = new Int8Array(W * H);  // per-cell horizontal velocity -10…+10
 
 const imgData = ctx.createImageData(W, H);
 const pixels  = imgData.data;
@@ -169,6 +170,7 @@ function swapCells(i, j) {
   t = grid[i];     grid[i]     = grid[j];     grid[j]     = t;
   t = colorVar[i]; colorVar[i] = colorVar[j]; colorVar[j] = t;
   t = meta[i];     meta[i]     = meta[j];     meta[j]     = t;
+  t = velX[i];     velX[i]     = velX[j];     velX[j]     = t;
   processed[i] = 1;
   processed[j] = 1;
 }
@@ -322,6 +324,40 @@ function processLightning() {
   }
 }
 
+// ─── Lateral velocity helper ─────────────────────────────────────────────────
+// windSens: wind push probability at full gravity (0.10 for sand, 0 for heavy mats).
+// At lower gravity an extra 0–0.25 boost is added so weightless objects respond well.
+// Returns true and moves the cell if it successfully applied velocity or wind.
+function applyVelocity(x, y, i, windSens) {
+  // Wind push — stronger when gravity is low
+  if (windX !== 0) {
+    const boost = (1 - Math.min(gravityStr, 1)) * 0.25;
+    if (rand() < Math.abs(windX) * (windSens + boost)) {
+      const dir = Math.sign(windX);
+      const nx  = x + dir;
+      if (inBounds(nx, y) && isPassable(grid[idx(nx, y)])) {
+        velX[i] = clamp(velX[i] + dir * 3, -10, 10); // accelerate toward wind
+        swapCells(i, idx(nx, y)); return true;
+      }
+    }
+  }
+  // Inertia — carry stored velocity; gravity provides friction
+  if (velX[i] !== 0) {
+    if (gravityStr > 0 && rand() < gravityStr * 0.3) {
+      velX[i] -= Math.sign(velX[i]); // friction decay
+    }
+    if (velX[i] !== 0 && rand() < Math.abs(velX[i]) / 10) {
+      const dir = Math.sign(velX[i]);
+      const nx  = x + dir;
+      if (inBounds(nx, y) && isPassable(grid[idx(nx, y)])) {
+        swapCells(i, idx(nx, y)); return true;
+      }
+      velX[i] = 0; // blocked — stop
+    }
+  }
+  return false;
+}
+
 // ─── Per-material update ──────────────────────────────────────────────────────
 function updateCell(x, y) {
   const i   = idx(x, y);
@@ -357,13 +393,7 @@ function updateCell(x, y) {
         if (dt === AIR || dt === SMOKE || dt === WATER || dt === OIL) { swapCells(i, di); return; }
       }
     }
-    // Wind erodes resting sand piles laterally
-    if (windX !== 0 && rand() < Math.abs(windX) * 0.10) {
-      const wx = x + Math.sign(windX);
-      if (inBounds(wx, y) && (grid[idx(wx, y)] === AIR || grid[idx(wx, y)] === SMOKE)) {
-        swapCells(i, idx(wx, y)); return;
-      }
-    }
+    if (applyVelocity(x, y, i, 0.10)) return;
     return;
   }
 
@@ -640,6 +670,7 @@ function updateCell(x, y) {
         if (grid[ni] === AIR || grid[ni] === WATER) setCel(nx, ny, PLANT);
       }
     }
+    if (applyVelocity(x, y, i, 0)) return;
     return;
   }
 
@@ -675,6 +706,7 @@ function updateCell(x, y) {
         grid[i] = SAND; colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
       }
     }
+    if (applyVelocity(x, y, i, 0)) return;
     return;
   }
 
@@ -741,6 +773,7 @@ function updateCell(x, y) {
         grid[i] = WATER; colorVar[i] = (rand()*255)|0; meta[i] = 0; processed[i] = 1; return;
       }
     }
+    if (applyVelocity(x, y, i, 0)) return;
     return;
   }
 
@@ -796,6 +829,7 @@ function updateCell(x, y) {
         }
       }
     }
+    if (applyVelocity(x, y, i, 0)) return;
     return;
   }
 
@@ -829,6 +863,7 @@ function updateCell(x, y) {
         grid[i] = AIR; processed[i] = 1; return;
       }
     }
+    if (applyVelocity(x, y, i, 0)) return;
     return;
   }
 
@@ -851,6 +886,7 @@ function updateCell(x, y) {
         grid[i] = SAND; colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
       }
     }
+    if (applyVelocity(x, y, i, 0)) return;
     return;
   }
 }
@@ -1199,7 +1235,7 @@ function updateBrushUI() {
 }
 
 function clearGrid() {
-  grid.fill(AIR); meta.fill(0);
+  grid.fill(AIR); meta.fill(0); velX.fill(0);
 }
 
 function togglePause() {
