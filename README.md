@@ -1,6 +1,6 @@
 # Falling Sand Simulation
 
-A browser-based particle physics sandbox with 15 interactive materials, wind, temperature, gravity, and explosive chain reactions — built with vanilla JavaScript and Canvas.
+A browser-based particle physics sandbox with 16 interactive materials, wind, temperature, gravity, and explosive chain reactions — built with vanilla JavaScript and Canvas.
 
 **Created by Tom Wellborn · 2026**
 
@@ -14,20 +14,21 @@ A browser-based particle physics sandbox with 15 interactive materials, wind, te
 
 | Key | Material | Behavior |
 |-----|----------|----------|
-| `1` | Acid | Sinks through water, dissolves most materials |
+| `1` | Acid | Sinks through water, dissolves most materials, evaporates above 639°F |
 | `2` | Electricity | Arcs through air, water, and acid; branches; ignites oil and wood on contact |
 | `3` | Fire | Rises, spreads to burnables, produces smoke, intensity affected by wind |
 | `4` | Glass | Falls and piles, acid-resistant, melts to lava above 5,000°F — formed when sand melts |
 | `5` | Gunpowder | Falls like sand, detonates on contact with fire or lava — chain explosions |
 | `6` | Ice | Falls, melts near fire or lava, slowly freezes adjacent water |
-| `7` | Lava | Flows at its own heat regardless of ambient temp, solidifies in cold environments |
-| `8` | Oil | Floats on water, ignites easily from fire, lava, or electricity |
-| `9` | Plant | Grows slowly upward, burns, falls when unsupported |
-| `Q` | Sand | Falls and piles, sinks through water and oil, melts at extreme temps |
-| `W` | Smoke | Rises and drifts, bends strongly in wind, persists when enclosed |
-| `E` | Stone | Falls and piles, melts into lava above 2,000°F |
-| `R` | Water | Flows and spreads, sinks through oil, extinguishes fire, freezes below 32°F |
-| `T` | Wood | Falls straight down, burns, does not slide diagonally |
+| `7` | Iron | Falls and piles, conducts electricity, melts to lava above 2,800°F, acid-resistant |
+| `8` | Lava | Flows at its own heat regardless of ambient temp, solidifies in cold environments |
+| `9` | Oil | Floats on water, ignites easily from fire, lava, or electricity |
+| `Q` | Plant | Grows slowly upward, burns, falls when unsupported |
+| `W` | Sand | Falls and piles, sinks through water and oil, melts at extreme temps |
+| `E` | Smoke | Rises and drifts, bends strongly in wind, persists when enclosed |
+| `R` | Stone | Falls and piles, melts into lava above 2,000°F |
+| `T` | Water | Flows and spreads, sinks through oil, extinguishes fire, freezes below 32°F |
+| `Y` | Wood | Falls straight down, burns, does not slide diagonally |
 | `0` | Erase | Remove cells |
 
 ---
@@ -87,12 +88,16 @@ Toggle **°F / °C** at any time. Scroll the temperature slider for fine ±5°F 
 | Fire + Ice | Gradual melt into water |
 | Oil + Fire / Lava / Electricity | Ignites rapidly |
 | Acid + anything | Dissolves it (acid slowly self-consumes) |
+| Acid above 639°F | Evaporates to smoke |
 | Ice + adjacent Water | Slowly freezes water outward |
 | Gunpowder + Fire / Lava | Chain detonation — blasts debris outward |
 | Electricity + Water / Acid | Arc conducts through the liquid |
+| Electricity + Iron | Conducts through without damaging iron |
 | Electricity + Gunpowder | Instant detonation |
 | Electricity + Oil | Ignites |
 | Electricity + Ice | Cracks to water |
+| Iron above 2,800°F | Melts into lava |
+| Acid + Iron | Very slow corrosion (5% of normal dissolve rate) |
 | Sand above 3,100°F | Melts into glass |
 | Glass above 5,000°F | Melts into lava |
 | Acid + Glass | No reaction — glass is acid-resistant |

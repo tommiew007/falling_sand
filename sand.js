@@ -20,24 +20,26 @@ const ICE       = 11;
 const GUNPOWDER   = 12;
 const ELECTRICITY = 13;
 const GLASS       = 14;
+const IRON        = 15;
 
 // ─── Material display ─────────────────────────────────────────────────────────
 const MAT_INFO = [
   { name: 'Erase',       color: '#1a1a1a', key: '0' },
-  { name: 'Sand',        color: '#c8a050', key: 'Q' },
-  { name: 'Water',       color: '#1a6fff', key: 'R' },
+  { name: 'Sand',        color: '#c8a050', key: 'W' },
+  { name: 'Water',       color: '#1a6fff', key: 'T' },
   { name: 'Fire',        color: '#ff5500', key: '3' },
-  { name: 'Plant',       color: '#22aa22', key: '9' },
-  { name: 'Wood',        color: '#8b5e3c', key: 'T' },
-  { name: 'Stone',       color: '#888888', key: 'E' },
-  { name: 'Oil',         color: '#a07810', key: '8' },
-  { name: 'Smoke',       color: '#666666', key: 'W' },
+  { name: 'Plant',       color: '#22aa22', key: 'Q' },
+  { name: 'Wood',        color: '#8b5e3c', key: 'Y' },
+  { name: 'Stone',       color: '#888888', key: 'R' },
+  { name: 'Oil',         color: '#a07810', key: '9' },
+  { name: 'Smoke',       color: '#666666', key: 'E' },
   { name: 'Acid',        color: '#39ff14', key: '1' },
-  { name: 'Lava',        color: '#ff6600', key: '7' },
+  { name: 'Lava',        color: '#ff6600', key: '8' },
   { name: 'Ice',         color: '#a0dfff', key: '6' },
   { name: 'Gunpowder',   color: '#28241e', key: '5' },
   { name: 'Electricity', color: '#c8eeff', key: '2' },
   { name: 'Glass',       color: '#b8e0f8', key: '4' },
+  { name: 'Iron',        color: '#8899aa', key: '7' },
 ];
 
 // ─── Canvas setup ─────────────────────────────────────────────────────────────
@@ -96,7 +98,8 @@ function pressureAbove(x, y) {
 // Stored internally in Fahrenheit. Slider range 0–5,000°F; Inferno button → 10,000°F.
 let ambientF   = 70;
 let useCelsius = false;
-let infernoOn  = false;
+let infernoOn    = false;
+let preInfernoF  = 70;  // temp saved before Inferno activates
 
 // Piecewise linear curve: [sliderPct (0–100), tempF]
 // Key thresholds each get proportional slider travel so precision is
@@ -143,11 +146,13 @@ function syncSlider() {
 // Key thresholds (°F)
 const T_FREEZE     =   32;   // water ↔ ice
 const T_BOIL       =  212;   // water → steam
+const T_ACID_BOIL  =  639;   // acid (H₂SO₄) boils to smoke
 const T_OIL_FLASH  =  500;   // oil auto-ignites
 const T_WOOD_BURN  =  480;   // wood / plant auto-ignites
 const T_LAVA_COOL  = 1300;   // lava solidifies without water below this
 const T_LAVA_INTRINSIC = 1800; // lava's own heat — used for flow/reactions regardless of ambient
 const T_STONE_MELT = 2000;   // stone → lava
+const T_IRON_MELT  = 2800;   // iron → lava
 const T_SAND_MELT  = 3100;   // sand → glass (silica melting point)
 const T_GLASS_MELT = 5000;   // glass → lava (above this ambient)
 
@@ -282,7 +287,7 @@ function processLightning() {
       const ni  = idx(nx, ny);
       const mat = grid[ni];
       const conductive = mat === AIR || mat === WATER || mat === ACID ||
-                         mat === SMOKE || mat === ELECTRICITY;
+                         mat === SMOKE || mat === ELECTRICITY || mat === IRON;
 
       if (!conductive) {
         // React with whatever stopped the bolt
@@ -298,8 +303,10 @@ function processLightning() {
         alive = false; break;
       }
 
-      // Leave electricity trail
-      grid[ni] = ELECTRICITY; meta[ni] = 4 + ((rand()*4)|0); colorVar[ni] = (rand()*255)|0; processed[ni] = 1;
+      // Leave electricity trail — iron conducts without being consumed
+      if (mat !== IRON) {
+        grid[ni] = ELECTRICITY; meta[ni] = 4 + ((rand()*4)|0); colorVar[ni] = (rand()*255)|0; processed[ni] = 1;
+      }
       bolt.x = nx; bolt.y = ny; bolt.len++;
 
       // Branch (perpendicular, capped)
@@ -599,13 +606,22 @@ function updateCell(x, y) {
     // Lava flows at its own heat; ambient only controls how fast it solidifies
     const lavaTemp     = Math.max(ambientF, T_LAVA_INTRINSIC);
     const lavaFallProb = Math.min(0.90, 0.45 + lavaTemp / 22222);
-    const lavaSideProb = Math.min(0.50, 0.12 + lavaTemp / 26316);
+    // Side spread kept close to 12% at intrinsic heat; scales up at extreme temps
+    const lavaSideProb = Math.min(0.45, 0.08 + lavaTemp / 50000);
 
     if (gravCheck() && y < H - 1 && rand() < lavaFallProb) {
       const dn = idx(x, y + 1);
       const bt = grid[dn];
-      if (bt === AIR || bt === SMOKE || bt === WATER || bt === OIL || bt === SAND) {
+      if (bt === AIR || bt === SMOKE || bt === WATER || bt === OIL || bt === SAND || bt === ACID) {
         swapCells(i, dn); return;
+      }
+      // Diagonal fall — gives lava an angle of repose instead of spreading flat
+      const d = rand() < 0.5 ? 1 : -1;
+      for (const ddx of [d, -d]) {
+        const nx = x + ddx;
+        if (!inBounds(nx, y + 1)) continue;
+        const di = idx(nx, y + 1);
+        if (isPassable(grid[di])) { swapCells(i, di); return; }
       }
     }
     if (gravityStr > 0 && rand() < lavaSideProb) {
@@ -621,6 +637,18 @@ function updateCell(x, y) {
 
   // ── Acid ──────────────────────────────────────────────────────────────────
   if (mat === ACID) {
+    // Evaporates above boiling point (H₂SO₄ boils at 639°F)
+    if (ambientF > T_ACID_BOIL && rand() < Math.min(0.90, (ambientF - T_ACID_BOIL) / 10390)) {
+      grid[i] = SMOKE; meta[i] = (rand()*60+30)|0; colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
+    }
+    // Lava contact: acid flash-vaporises (lava is ~1000°C — far above acid's boiling point)
+    for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (!inBounds(nx, ny)) continue;
+      if (grid[idx(nx, ny)] === LAVA && rand() < 0.6) {
+        grid[i] = SMOKE; meta[i] = (rand()*40+20)|0; colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
+      }
+    }
     // Dissolves faster at higher ambient temps
     const dissolveRate = clamp(0.06 * (1 + ambientF / 5000), 0.03, 0.14);
     if (rand() < dissolveRate) {
@@ -630,7 +658,13 @@ function updateCell(x, y) {
         if (!inBounds(nx, ny)) continue;
         const ni = idx(nx, ny);
         const nt = grid[ni];
-        if (nt !== AIR && nt !== ACID && nt !== SMOKE && nt !== GLASS) {
+        if (nt !== AIR && nt !== ACID && nt !== SMOKE && nt !== GLASS && nt !== IRON && nt !== LAVA) {
+          grid[ni]     = SMOKE; meta[ni]     = (rand()*20+5)|0; colorVar[ni] = (rand()*255)|0;
+          if (rand() < 0.2) { grid[i] = AIR; processed[i] = 1; return; }
+          break;
+        }
+        // Iron dissolves very slowly — ~5% of normal rate
+        if (nt === IRON && rand() < 0.003) {
           grid[ni]     = SMOKE; meta[ni]     = (rand()*20+5)|0; colorVar[ni] = (rand()*255)|0;
           if (rand() < 0.2) { grid[i] = AIR; processed[i] = 1; return; }
           break;
@@ -878,6 +912,33 @@ function updateCell(x, y) {
     return;
   }
 
+  // ── Iron ──────────────────────────────────────────────────────────────────
+  if (mat === IRON) {
+    // Melts at 2,800°F (iron melting point) → lava
+    if (ambientF > T_IRON_MELT) {
+      const p = Math.min(0.70, (ambientF - T_IRON_MELT) / 10286);
+      if (rand() < p) {
+        grid[i] = LAVA; colorVar[i] = (rand()*255)|0; meta[i] = 0; processed[i] = 1; return;
+      }
+    }
+    // Falls and piles like stone — sinks through water and oil
+    if (gravCheck() && y < H - 1) {
+      const dn = idx(x, y + 1);
+      const bt = grid[dn];
+      if (bt === AIR || bt === SMOKE || bt === WATER || bt === OIL) { swapCells(i, dn); return; }
+      const d = rand() < 0.5 ? 1 : -1;
+      for (const dx of [d, -d]) {
+        const nx = x + dx;
+        if (!inBounds(nx, y + 1)) continue;
+        const di = idx(nx, y + 1);
+        const dt = grid[di];
+        if (dt === AIR || dt === SMOKE || dt === WATER || dt === OIL) { swapCells(i, di); return; }
+      }
+    }
+    if (applyVelocity(x, y, i, 0)) return;
+    return;
+  }
+
   // ── Wood ──────────────────────────────────────────────────────────────────
   if (mat === WOOD) {
     // Auto-ignition — scales to ~50% chance/frame at 10,000°F
@@ -935,19 +996,32 @@ const BASE = [
   [ 40,  35,  28],  // GUNPOWDER
   [  0,   0,   0],  // ELECTRICITY (handled above)
   [175, 215, 240],  // GLASS
+  [136, 153, 170],  // IRON
 ];
-const VAR = [0, 28, 0, 0, 22, 22, 18, 16, 0, 0, 0, 12, 10, 0, 30];
+const VAR = [0, 28, 0, 0, 22, 22, 18, 16, 0, 0, 0, 12, 10, 0, 30, 14];
+
+function getBgRGB() {
+  if (infernoOn) {
+    const pulse = 0.5 + 0.5 * Math.sin(frame * 0.06);
+    return [(160 + pulse * 60) | 0, (pulse * 55) | 0, 0];
+  }
+  const heat = Math.min(1, Math.max(0, ambientF / 5000));
+  return [(heat * 42) | 0, 0, 0];
+}
 
 function render() {
   const t = frame;
+  const [bgR, bgG, bgB] = getBgRGB();
+  viewport.style.background = `rgb(${bgR},${bgG},${bgB})`;
+
   for (let i = 0, p = 0; i < W * H; i++, p += 4) {
     const mat = grid[i];
     const cv  = colorVar[i];
     const lf  = meta[i];
-    let r = 0, g = 0, b = 0;
+    let r = bgR, g = bgG, b = bgB;
 
     if (mat === AIR) {
-      // black
+      // background color already set as default
     } else if (mat === FIRE) {
       const heat    = Math.min(lf / 80, 1);
       const flicker = 0.75 + (cv / 255) * 0.25;
@@ -1147,10 +1221,10 @@ helpEl.addEventListener('mousedown', e => {
 // ─── Keyboard ─────────────────────────────────────────────────────────────────
 const KEY_MAP = {
   '0': AIR,  '1': ACID,  '2': ELECTRICITY, '3': FIRE, '4': GLASS,
-  '5': GUNPOWDER, '6': ICE, '7': LAVA, '8': OIL, '9': PLANT,
-  'q': SAND,  'Q': SAND,  'w': SMOKE, 'W': SMOKE, 'e': STONE, 'E': STONE,
-  'r': WATER, 'R': WATER,
-  't': WOOD,  'T': WOOD,
+  '5': GUNPOWDER, '6': ICE, '7': IRON, '8': LAVA, '9': OIL,
+  'q': PLANT, 'Q': PLANT, 'w': SAND,  'W': SAND,  'e': SMOKE, 'E': SMOKE,
+  'r': STONE, 'R': STONE, 't': WATER, 'T': WATER,
+  'y': WOOD,  'Y': WOOD,
 };
 
 window.addEventListener('keydown', e => {
@@ -1250,9 +1324,10 @@ document.getElementById('btnInferno').addEventListener('click', () => {
   btn.classList.toggle('on', infernoOn);
   sliderEl.disabled = infernoOn;
   if (infernoOn) {
+    preInfernoF = ambientF;
     ambientF = 10000;
   } else {
-    ambientF = 5000;
+    ambientF = preInfernoF;
     syncSlider();
   }
   updateTempDisplay();
@@ -1281,7 +1356,7 @@ function togglePause() {
 }
 
 // Palette display order — alphabetical, Erase pinned first
-const PALETTE_ORDER = [AIR, ACID, ELECTRICITY, FIRE, GLASS, GUNPOWDER, ICE, LAVA, OIL, PLANT, SAND, SMOKE, STONE, WATER, WOOD];
+const PALETTE_ORDER = [AIR, ACID, ELECTRICITY, FIRE, GLASS, GUNPOWDER, ICE, IRON, LAVA, OIL, PLANT, SAND, SMOKE, STONE, WATER, WOOD];
 
 const palette = document.getElementById('palette');
 PALETTE_ORDER.forEach(matId => {
@@ -1384,7 +1459,7 @@ function _restoreFromBuf(buf) {
     infernoOn  = !!(flags & 1);
     useCelsius = !!(flags & 2);
     musicIdx   = buf[ui + 8] - 1;
-    selectedMat = Math.min(buf[ui + 9], GLASS);
+    selectedMat = Math.min(buf[ui + 9], MAT_INFO.length - 1);
 
     // Sync all UI widgets to restored state
     infernoOn
@@ -1499,7 +1574,7 @@ let   _icTimer = null;
 // Title colour per material — brighter than swatch so it reads on dark card
 const IC_COL = ['#333','#c8a050','#4a9eff','#ff6622','#33cc33','#aa7755',
                 '#aaaaaa','#cc9922','#999999','#44ff22','#ff8833','#aaddff',
-                '#bbaa88','#88ddff','#cce8ff'];
+                '#bbaa88','#88ddff','#cce8ff','#99aabb'];
 
 // Collect distinct non-air materials within a 5×5 neighbourhood
 function _icNear(x, y) {
@@ -1680,6 +1755,18 @@ function _icBuild(mat, x, y) {
           'Amorphous — atoms lack long-range order (not technically a solid)',
           'Glass transition ~1,100°F (593°C) — softens before melting',
           'Only HF acid can dissolve SiO₂ — all others bounce off'];
+      break;
+    case IRON:
+      formula='Iron · Fe';
+      state = T>T_IRON_MELT ? `⚠ Above melt point (${Ts}) — liquefying to lava`
+            : 'Dense solid metal — electrically conductive';
+      if(nr.has(LAVA))        rx.push(['Lava','melting — iron liquefies above 2,800°F']);
+      if(nr.has(ELECTRICITY)) rx.push(['Electricity','conducting — iron is a metallic conductor']);
+      if(nr.has(ACID))        rx.push(['Acid','slow corrosion — Fe + H₂SO₄ → FeSO₄ + H₂']);
+      fx=['Melting point 2,800°F (1,538°C) — most common metal on Earth by mass',
+          'Density 7.87 g/cm³ — ~3× denser than stone, sinks through most materials',
+          'Excellent conductor: resistivity 10 nΩ·m — lightning passes through intact',
+          'Earth\'s core is primarily molten iron and nickel at ~9,000°F'];
       break;
   }
 
