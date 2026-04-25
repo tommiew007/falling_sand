@@ -468,8 +468,9 @@ function updateCell(x, y) {
     if (enclosed) { grid[i] = AIR; processed[i] = 1; return; }
 
     // Cold air kills fire faster; hot air makes it last longer
+    // Guard against Uint16 underflow (e.g. meta=1, burnRate=2 → wraps to 65535)
     const burnRate = ambientF < T_FREEZE ? 3 : ambientF < 100 ? 2 : 1;
-    meta[i] -= burnRate;
+    meta[i] = meta[i] > burnRate ? meta[i] - burnRate : 0;
 
     if (meta[i] <= 0) {
       grid[i]     = rand() < 0.55 ? SMOKE : AIR;
