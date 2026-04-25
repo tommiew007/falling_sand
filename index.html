@@ -149,36 +149,47 @@
       display: flex;
       flex-direction: row;
       align-items: center;
-      gap: 3px;
+      gap: 2px;
+      flex-shrink: 1;
+      min-width: 0;
     }
 
     .mat-btn {
       display: flex;
-      flex-direction: row;
+      flex-direction: column;
       align-items: center;
-      gap: 5px;
+      gap: 1px;
       cursor: pointer;
-      padding: 4px 7px;
+      padding: 3px 5px;
       border-radius: 4px;
       border: 1px solid transparent;
       transition: border-color 0.1s;
       user-select: none;
-      white-space: nowrap;
     }
 
     .mat-btn:hover { border-color: #444; }
     .mat-btn.selected { border-color: #aaa; background: #1e1e1e; }
 
     .swatch {
-      width: 14px;
-      height: 14px;
+      width: 16px;
+      height: 16px;
       border-radius: 2px;
       border: 1px solid rgba(255,255,255,0.15);
       flex-shrink: 0;
     }
 
-    .mat-btn span { color: #bbb; font-size: 13px; }
+    .mat-btn .mat-key { color: #555; font-size: 8px; letter-spacing: 0; line-height: 1; }
+    .mat-btn.selected .mat-key { color: #999; }
     .mat-btn small { display: none; }
+
+    /* Selected material name shown separately */
+    #sel-name {
+      font-size: 11px;
+      color: #888;
+      white-space: nowrap;
+      padding: 0 4px;
+      min-width: 60px;
+    }
 
     .sep { width: 1px; height: 28px; background: #222; margin: 0 5px; flex-shrink: 0; }
 
@@ -201,7 +212,7 @@
     .ctrl-group span  { color: #888; min-width: 14px; }
 
     input[type=range] {
-      width: 65px;
+      width: 55px;
       accent-color: #888;
       cursor: pointer;
     }
@@ -220,14 +231,14 @@
       line-height: 1.2;
     }
 
-    #tempVal  { font-size: 16px; font-weight: bold; color: #ccc; white-space: nowrap; min-width: 80px; text-align: right; transition: color 0.4s; }
+    #tempVal  { font-size: 14px; font-weight: bold; color: #ccc; white-space: nowrap; min-width: 64px; text-align: right; transition: color 0.4s; }
     #tempDesc { font-size: 9px; color: #555; letter-spacing: 1px; transition: color 0.4s; }
 
     /* gradient-backed range track — stops aligned to the piecewise curve breakpoints */
     #sTempSlider {
       -webkit-appearance: none;
       appearance: none;
-      width: 160px;
+      width: 120px;
       height: 5px;
       border-radius: 3px;
       cursor: pointer;
@@ -358,6 +369,7 @@
 
 <div id="bar">
   <div id="palette"></div>
+  <span id="sel-name">Sand</span>
 
   <div class="sep"></div>
 

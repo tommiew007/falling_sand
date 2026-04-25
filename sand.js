@@ -934,6 +934,7 @@ function updatePaletteUI() {
   document.querySelectorAll('.mat-btn').forEach((btn, i) => {
     btn.classList.toggle('selected', i === selectedMat);
   });
+  selNameEl.textContent = MAT_INFO[selectedMat].name;
 }
 
 function updateBrushUI() {
@@ -950,13 +951,15 @@ function togglePause() {
   document.getElementById('btnPause').textContent = paused ? 'resume (P)' : 'pause (P)';
 }
 
-const palette = document.getElementById('palette');
+const palette   = document.getElementById('palette');
+const selNameEl = document.getElementById('sel-name');
 MAT_INFO.forEach((m, i) => {
   const btn = document.createElement('div');
   btn.className = 'mat-btn' + (i === SAND ? ' selected' : '');
+  btn.title = `${m.name}  [${m.key}]`;
   btn.innerHTML =
     `<div class="swatch" style="background:${m.color}"></div>` +
-    `<span>${m.name}</span>`;
+    `<span class="mat-key">${m.key}</span>`;
   btn.addEventListener('click', () => { selectedMat = i; updatePaletteUI(); });
   palette.appendChild(btn);
 });
