@@ -16,22 +16,24 @@ const OIL   = 7;
 const SMOKE = 8;
 const ACID  = 9;
 const LAVA  = 10;
-const ICE   = 11;
+const ICE       = 11;
+const GUNPOWDER = 12;
 
 // ─── Material display ─────────────────────────────────────────────────────────
 const MAT_INFO = [
-  { name: 'Erase',  color: '#1a1a1a', key: '0' },
-  { name: 'Sand',   color: '#c8a050', key: '1' },
-  { name: 'Water',  color: '#1a6fff', key: '2' },
-  { name: 'Fire',   color: '#ff5500', key: '3' },
-  { name: 'Plant',  color: '#22aa22', key: '4' },
-  { name: 'Wood',   color: '#8b5e3c', key: '5' },
-  { name: 'Stone',  color: '#888888', key: '6' },
-  { name: 'Oil',    color: '#a07810', key: '7' },
-  { name: 'Smoke',  color: '#666666', key: '8' },
-  { name: 'Acid',   color: '#39ff14', key: '9' },
-  { name: 'Lava',   color: '#ff6600', key: 'Q' },
-  { name: 'Ice',    color: '#a0dfff', key: 'W' },
+  { name: 'Erase',     color: '#1a1a1a', key: '0' },
+  { name: 'Sand',      color: '#c8a050', key: '1' },
+  { name: 'Water',     color: '#1a6fff', key: '2' },
+  { name: 'Fire',      color: '#ff5500', key: '3' },
+  { name: 'Plant',     color: '#22aa22', key: '4' },
+  { name: 'Wood',      color: '#8b5e3c', key: '5' },
+  { name: 'Stone',     color: '#888888', key: '6' },
+  { name: 'Oil',       color: '#a07810', key: '7' },
+  { name: 'Smoke',     color: '#666666', key: '8' },
+  { name: 'Acid',      color: '#39ff14', key: '9' },
+  { name: 'Lava',      color: '#ff6600', key: 'Q' },
+  { name: 'Ice',       color: '#a0dfff', key: 'W' },
+  { name: 'Gunpowder', color: '#28241e', key: 'E' },
 ];
 
 // ─── Canvas setup ─────────────────────────────────────────────────────────────
@@ -135,6 +137,77 @@ function swapCells(i, j) {
 
 const isBurnable = mat => mat === WOOD || mat === PLANT || mat === OIL;
 const isPassable = mat => mat === AIR || mat === SMOKE;
+
+// ─── Explosion system ─────────────────────────────────────────────────────────
+const explosionQueue = [];
+
+function triggerExplosion(x, y) {
+  explosionQueue.push({x, y});
+}
+
+function processExplosions() {
+  if (explosionQueue.length === 0) return;
+  const detonated = new Set();
+  let limit = 400; // cap chain length to prevent frame drops
+
+  while (explosionQueue.length > 0 && limit-- > 0) {
+    const {x, y} = explosionQueue.shift();
+    const key = y * W + x;
+    if (detonated.has(key)) continue;
+    detonated.add(key);
+
+    const r  = 12;
+    const r2 = r * r;
+    const coreLim = r2 * 0.12;  // inner 35% radius — vaporised
+    const midLim  = r2 * 0.42;  // mid 65% radius — fire cloud
+
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const d2 = dx * dx + dy * dy;
+        if (d2 > r2) continue;
+        const px = x + dx, py = y + dy;
+        if (!inBounds(px, py)) continue;
+        const pi  = idx(px, py);
+        const mat = grid[pi];
+
+        // Chain-detonate any gunpowder in blast radius
+        if (mat === GUNPOWDER) {
+          const gk = py * W + px;
+          if (!detonated.has(gk)) explosionQueue.push({x: px, y: py});
+        }
+
+        if (d2 < coreLim) {
+          // Core: vaporize
+          grid[pi] = AIR; meta[pi] = 0; processed[pi] = 1;
+        } else if (d2 < midLim) {
+          // Mid: fire cloud
+          if (mat !== AIR) {
+            grid[pi] = FIRE; meta[pi] = (rand()*50+20)|0; colorVar[pi] = (rand()*255)|0; processed[pi] = 1;
+          }
+        } else {
+          // Outer ring: scatter debris outward, remainder becomes smoke/fire
+          if (mat !== AIR && mat !== SMOKE && mat !== FIRE) {
+            if (rand() < 0.40) {
+              const dist    = Math.sqrt(d2);
+              const scatter = 2 + ((rand() * 5) | 0);
+              const tx = (px + (dx / dist) * scatter + 0.5) | 0;
+              const ty = (py + (dy / dist) * scatter + 0.5) | 0;
+              if (inBounds(tx, ty) && grid[idx(tx, ty)] === AIR) {
+                const ti = idx(tx, ty);
+                grid[ti] = mat; colorVar[ti] = colorVar[pi]; meta[ti] = meta[pi];
+                grid[pi] = AIR; processed[pi] = 1;
+              } else {
+                grid[pi] = FIRE; meta[pi] = (rand()*25+10)|0; colorVar[pi] = (rand()*255)|0; processed[pi] = 1;
+              }
+            } else if (rand() < 0.5) {
+              grid[pi] = SMOKE; meta[pi] = (rand()*40+20)|0; colorVar[pi] = (rand()*255)|0; processed[pi] = 1;
+            }
+          }
+        }
+      }
+    }
+  }
+}
 
 // ─── Per-material update ──────────────────────────────────────────────────────
 function updateCell(x, y) {
@@ -510,6 +583,41 @@ function updateCell(x, y) {
     return;
   }
 
+  // ── Gunpowder ─────────────────────────────────────────────────────────────
+  if (mat === GUNPOWDER) {
+    // Spontaneous ignition above wood-burn threshold
+    if (ambientF > T_WOOD_BURN && rand() < 0.001) {
+      grid[i] = FIRE; meta[i] = 15; colorVar[i] = (rand()*255)|0; processed[i] = 1;
+      triggerExplosion(x, y); return;
+    }
+    // Ignite from adjacent fire or lava — instant detonation
+    for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (!inBounds(nx, ny)) continue;
+      const nb = grid[idx(nx, ny)];
+      if (nb === FIRE || nb === LAVA) {
+        grid[i] = FIRE; meta[i] = 15; colorVar[i] = (rand()*255)|0; processed[i] = 1;
+        triggerExplosion(x, y); return;
+      }
+    }
+    // Gravity — falls and piles like sand, sinks through liquids
+    if (y < H - 1) {
+      const dn = idx(x, y + 1);
+      const bt = grid[dn];
+      if (bt === AIR || bt === SMOKE || bt === WATER || bt === OIL) { swapCells(i, dn); return; }
+      const dirs = rand() < 0.5 ? [-1, 1] : [1, -1];
+      for (const ddx of dirs) {
+        const nx = x + ddx;
+        if (inBounds(nx, y + 1)) {
+          const di = idx(nx, y + 1);
+          const dt = grid[di];
+          if (dt === AIR || dt === SMOKE || dt === WATER || dt === OIL) { swapCells(i, di); return; }
+        }
+      }
+    }
+    return;
+  }
+
   // ── Wood ──────────────────────────────────────────────────────────────────
   if (mat === WOOD) {
     // Auto-ignition — scales to ~50% chance/frame at 10,000°F
@@ -537,6 +645,7 @@ function step() {
       for (let x = W - 1; x >= 0; x--) updateCell(x, y);
     }
   }
+  processExplosions();
   frame++;
 }
 
@@ -554,8 +663,9 @@ const BASE = [
   [20,  220,  10],  // ACID
   [255,  80,   0],  // LAVA
   [155, 220, 255],  // ICE
+  [ 40,  35,  28],  // GUNPOWDER
 ];
-const VAR = [0, 28, 0, 0, 22, 22, 18, 16, 0, 0, 0, 12];
+const VAR = [0, 28, 0, 0, 22, 22, 18, 16, 0, 0, 0, 12, 10];
 
 function render() {
   const t = frame;
@@ -638,7 +748,7 @@ function toGrid(clientX, clientY) {
   };
 }
 
-const CHUNKY_MATS = new Set([SAND, STONE, WOOD, ICE, PLANT, LAVA]);
+const CHUNKY_MATS = new Set([SAND, STONE, WOOD, ICE, PLANT, LAVA, GUNPOWDER]);
 
 function paintAt(gx, gy) {
   const r   = brushSize;
@@ -738,7 +848,7 @@ document.getElementById('help').addEventListener('mousedown', e => {
 const KEY_MAP = {
   '0': AIR,  '1': SAND, '2': WATER, '3': FIRE,  '4': PLANT,
   '5': WOOD, '6': STONE,'7': OIL,   '8': SMOKE, '9': ACID,
-  'q': LAVA, 'Q': LAVA, 'w': ICE,   'W': ICE,
+  'q': LAVA, 'Q': LAVA, 'w': ICE,   'W': ICE,   'e': GUNPOWDER, 'E': GUNPOWDER,
 };
 
 window.addEventListener('keydown', e => {
