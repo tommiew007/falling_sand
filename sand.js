@@ -635,18 +635,41 @@ function toGrid(clientX, clientY) {
   };
 }
 
+const CHUNKY_MATS = new Set([SAND, STONE, WOOD, ICE, PLANT, LAVA]);
+
 function paintAt(gx, gy) {
   const r   = brushSize;
   const r2  = r * r;
   const life = selectedMat === FIRE  ? ((rand() * 100 + 60) | 0)
              : selectedMat === SMOKE ? ((rand() * 50  + 20) | 0)
              : 0;
-  for (let dy = -r; dy <= r; dy++) {
-    for (let dx = -r; dx <= r; dx++) {
-      if (dx * dx + dy * dy > r2) continue;
-      const px = gx + dx, py = gy + dy;
-      if (!inBounds(px, py)) continue;
-      setCel(px, py, selectedMat, life);
+
+  if (CHUNKY_MATS.has(selectedMat) && brushSize >= 3) {
+    // Chunk size scales with brush: brush 3-5→2, 6-9→3, 10-14→4, 15+→5
+    const cs = Math.min(5, 1 + Math.floor(brushSize / 3));
+    const half = cs / 2;
+    for (let dy = -r; dy <= r; dy += cs) {
+      for (let dx = -r; dx <= r; dx += cs) {
+        // Test chunk center against brush circle
+        const ccx = dx + half, ccy = dy + half;
+        if (ccx * ccx + ccy * ccy > r2) continue;
+        for (let ky = 0; ky < cs; ky++) {
+          for (let kx = 0; kx < cs; kx++) {
+            const px = gx + dx + kx, py = gy + dy + ky;
+            if (!inBounds(px, py)) continue;
+            setCel(px, py, selectedMat, life);
+          }
+        }
+      }
+    }
+  } else {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (dx * dx + dy * dy > r2) continue;
+        const px = gx + dx, py = gy + dy;
+        if (!inBounds(px, py)) continue;
+        setCel(px, py, selectedMat, life);
+      }
     }
   }
 }
