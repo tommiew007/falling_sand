@@ -19,6 +19,7 @@ const LAVA  = 10;
 const ICE       = 11;
 const GUNPOWDER   = 12;
 const ELECTRICITY = 13;
+const GLASS       = 14;
 
 // ─── Material display ─────────────────────────────────────────────────────────
 const MAT_INFO = [
@@ -36,6 +37,7 @@ const MAT_INFO = [
   { name: 'Ice',       color: '#a0dfff', key: 'W' },
   { name: 'Gunpowder',   color: '#28241e', key: 'E' },
   { name: 'Electricity', color: '#c8eeff', key: 'R' },
+  { name: 'Glass',       color: '#b8e0f8', key: 'T' },
 ];
 
 // ─── Canvas setup ─────────────────────────────────────────────────────────────
@@ -116,7 +118,8 @@ const T_WOOD_BURN  =  480;   // wood / plant auto-ignites
 const T_LAVA_COOL  = 1300;   // lava solidifies without water below this
 const T_LAVA_INTRINSIC = 1800; // lava's own heat — used for flow/reactions regardless of ambient
 const T_STONE_MELT = 2000;   // stone → lava
-const T_SAND_MELT  = 3100;   // sand → lava (silica melting point)
+const T_SAND_MELT  = 3100;   // sand → glass (silica melting point)
+const T_GLASS_MELT = 5000;   // glass → lava (above this ambient)
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const inBounds  = (x, y) => x >= 0 && x < W && y >= 0 && y < H;
@@ -303,9 +306,9 @@ function updateCell(x, y) {
     if (ambientF > T_SAND_MELT) {
       const p = Math.min(0.70, (ambientF - T_SAND_MELT) / 9857);
       if (rand() < p) {
-        // Above 7,000°F a fraction vaporises directly instead of becoming lava
+        // Above 7,000°F vaporises; above T_GLASS_MELT becomes lava; otherwise glass
         const vaporise = ambientF > 7000 && rand() < (ambientF - 7000) / 10000;
-        grid[i] = vaporise ? SMOKE : LAVA;
+        grid[i] = vaporise ? SMOKE : (ambientF > T_GLASS_MELT ? LAVA : GLASS);
         meta[i] = vaporise ? (rand()*80+40)|0 : 0;
         colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
       }
@@ -553,7 +556,7 @@ function updateCell(x, y) {
         if (!inBounds(nx, ny)) continue;
         const ni = idx(nx, ny);
         const nt = grid[ni];
-        if (nt !== AIR && nt !== ACID && nt !== SMOKE) {
+        if (nt !== AIR && nt !== ACID && nt !== SMOKE && nt !== GLASS) {
           grid[ni]     = SMOKE; meta[ni]     = (rand()*20+5)|0; colorVar[ni] = (rand()*255)|0;
           if (rand() < 0.2) { grid[i] = AIR; processed[i] = 1; return; }
           break;
@@ -747,6 +750,32 @@ function updateCell(x, y) {
     return;
   }
 
+  // ── Glass ─────────────────────────────────────────────────────────────────
+  if (mat === GLASS) {
+    // Melts back to lava at extreme temps
+    if (ambientF > T_GLASS_MELT) {
+      const p = Math.min(0.70, (ambientF - T_GLASS_MELT) / 7143);
+      if (rand() < p) {
+        grid[i] = LAVA; colorVar[i] = (rand()*255)|0; meta[i] = 0; processed[i] = 1; return;
+      }
+    }
+    // Falls and piles like stone
+    if (y < H - 1) {
+      const dn = idx(x, y + 1);
+      const bt = grid[dn];
+      if (bt === AIR || bt === SMOKE || bt === WATER || bt === OIL) { swapCells(i, dn); return; }
+      const d = rand() < 0.5 ? 1 : -1;
+      for (const dx of [d, -d]) {
+        const nx = x + dx;
+        if (!inBounds(nx, y + 1)) continue;
+        const di = idx(nx, y + 1);
+        const dt = grid[di];
+        if (dt === AIR || dt === SMOKE || dt === WATER || dt === OIL) { swapCells(i, di); return; }
+      }
+    }
+    return;
+  }
+
   // ── Wood ──────────────────────────────────────────────────────────────────
   if (mat === WOOD) {
     // Auto-ignition — scales to ~50% chance/frame at 10,000°F
@@ -794,8 +823,10 @@ const BASE = [
   [255,  80,   0],  // LAVA
   [155, 220, 255],  // ICE
   [ 40,  35,  28],  // GUNPOWDER
+  [  0,   0,   0],  // ELECTRICITY (handled above)
+  [175, 215, 240],  // GLASS
 ];
-const VAR = [0, 28, 0, 0, 22, 22, 18, 16, 0, 0, 0, 12, 10];
+const VAR = [0, 28, 0, 0, 22, 22, 18, 16, 0, 0, 0, 12, 10, 0, 30];
 
 function render() {
   const t = frame;
@@ -839,6 +870,11 @@ function render() {
       r = (160 + cv * 0.37 * v) | 0;
       g = (210 * v)              | 0;
       b = 255;
+    } else if (mat === GLASS) {
+      const shimmer = Math.sin(t * 0.05 + cv * 0.13) * 12;
+      r = Math.min(255, Math.max(0, 148 + (cv / 255) * 60 + shimmer)) | 0;
+      g = Math.min(255, Math.max(0, 200 + (cv / 255) * 30 + shimmer * 0.6)) | 0;
+      b = Math.min(255, Math.max(0, 230 + shimmer * 0.4)) | 0;
     } else {
       const bc = BASE[mat];
       const va = VAR[mat];
@@ -885,7 +921,7 @@ function toGrid(clientX, clientY) {
   };
 }
 
-const CHUNKY_MATS = new Set([SAND, STONE, WOOD, ICE, PLANT, LAVA, GUNPOWDER]);
+const CHUNKY_MATS = new Set([SAND, STONE, WOOD, ICE, PLANT, LAVA, GUNPOWDER, GLASS]);
 
 function paintAt(gx, gy) {
   // Electricity spawns directional bolts rather than placing cells
@@ -1004,6 +1040,7 @@ const KEY_MAP = {
   '5': WOOD, '6': STONE,'7': OIL,   '8': SMOKE, '9': ACID,
   'q': LAVA, 'Q': LAVA, 'w': ICE,   'W': ICE,   'e': GUNPOWDER, 'E': GUNPOWDER,
   'r': ELECTRICITY, 'R': ELECTRICITY,
+  't': GLASS,       'T': GLASS,
 };
 
 window.addEventListener('keydown', e => {
@@ -1107,7 +1144,7 @@ function togglePause() {
 }
 
 // Palette display order — alphabetical, Erase pinned first
-const PALETTE_ORDER = [AIR, ACID, ELECTRICITY, FIRE, GUNPOWDER, ICE, LAVA, OIL, PLANT, SAND, SMOKE, STONE, WATER, WOOD];
+const PALETTE_ORDER = [AIR, ACID, ELECTRICITY, FIRE, GLASS, GUNPOWDER, ICE, LAVA, OIL, PLANT, SAND, SMOKE, STONE, WATER, WOOD];
 
 const palette = document.getElementById('palette');
 PALETTE_ORDER.forEach(matId => {

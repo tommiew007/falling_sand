@@ -1,6 +1,6 @@
 # Falling Sand Simulation
 
-A browser-based particle physics sandbox with 14 interactive materials, wind, temperature, and explosive chain reactions — built with vanilla JavaScript and Canvas.
+A browser-based particle physics sandbox with 15 interactive materials, wind, temperature, and explosive chain reactions — built with vanilla JavaScript and Canvas.
 
 **Live demo:** https://tommiew007.github.io/falling_sand/
 
@@ -25,6 +25,7 @@ A browser-based particle physics sandbox with 14 interactive materials, wind, te
 | `W` | Ice | Falls, melts near fire or lava, slowly freezes adjacent water |
 | `E` | Gunpowder | Falls like sand, detonates on contact with fire or lava — chain explosions |
 | `R` | Electricity | Arcs through air, water, and acid; branches; ignites oil and wood on contact |
+| `T` | Glass | Falls and piles, acid-resistant, melts to lava above 5,000°F — formed when sand melts |
 | `0` | Erase | Remove cells |
 
 ---
@@ -56,7 +57,8 @@ Larger brush sizes paint coarser chunks for solid materials (sand, stone, wood, 
 | Above 212°F | Water evaporates to steam |
 | Above 480°F | Wood and oil spontaneously combust |
 | Above 2,000°F | Stone melts back into lava |
-| Above 3,100°F | Sand melts into lava |
+| Above 3,100°F | Sand melts into glass |
+| Above 5,000°F | Glass melts into lava |
 | Above 10,000°F | Plasma — most materials vaporise |
 
 Toggle **°F / °C** at any time. Scroll the temperature slider for fine ±5°F adjustment; Shift+scroll for ±1°F.
@@ -80,6 +82,9 @@ Toggle **°F / °C** at any time. Scroll the temperature slider for fine ±5°F 
 | Electricity + Gunpowder | Instant detonation |
 | Electricity + Oil | Ignites |
 | Electricity + Ice | Cracks to water |
+| Sand above 3,100°F | Melts into glass |
+| Glass above 5,000°F | Melts into lava |
+| Acid + Glass | No reaction — glass is acid-resistant |
 | Water below 32°F (painted) | Automatically placed as ice chunks |
 
 ---
