@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Falling Sand</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0a0a;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      height: 100vh;
+      font-family: 'Courier New', monospace;
+    }
+
+    #viewport {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      cursor: crosshair;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    #bar {
+      width: 100%;
+      background: #111;
+      border-top: 1px solid #222;
+      padding: 6px 10px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    #palette {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .mat-btn {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      padding: 4px 7px;
+      border-radius: 4px;
+      border: 1px solid transparent;
+      transition: border-color 0.1s;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .mat-btn:hover { border-color: #444; }
+    .mat-btn.selected { border-color: #aaa; background: #1e1e1e; }
+
+    .swatch {
+      width: 16px;
+      height: 16px;
+      border-radius: 2px;
+      border: 1px solid rgba(255,255,255,0.15);
+      flex-shrink: 0;
+    }
+
+    .mat-btn span { color: #bbb; font-size: 13px; }
+    .mat-btn small { display: none; }
+
+    #sep { width: 1px; height: 30px; background: #2a2a2a; margin: 0 4px; flex-shrink: 0; }
+
+    #right-controls {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .ctrl-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #666;
+      font-size: 11px;
+    }
+
+    .ctrl-group label { color: #888; }
+
+    input[type=range] {
+      width: 70px;
+      accent-color: #aaa;
+    }
+
+    #fps { color: #444; font-size: 11px; }
+
+    button {
+      background: #1a1a1a;
+      color: #888;
+      border: 1px solid #2a2a2a;
+      padding: 4px 10px;
+      font: 11px 'Courier New', monospace;
+      cursor: pointer;
+      border-radius: 3px;
+    }
+    button:hover { color: #ccc; border-color: #444; }
+  </style>
+</head>
+<body>
+
+<div id="viewport">
+  <canvas id="canvas"></canvas>
+</div>
+
+<div id="bar">
+  <div id="palette"></div>
+  <div id="sep"></div>
+  <div id="right-controls">
+    <div class="ctrl-group">
+      <label>brush</label>
+      <input id="sBrush" type="range" min="1" max="20" value="4">
+      <span id="vBrush">4</span>
+    </div>
+    <button id="btnClear">clear (C)</button>
+    <button id="btnPause">pause (P)</button>
+    <span id="fps">fps: —</span>
+  </div>
+</div>
+
+<script src="sand.js"></script>
+</body>
+</html>
