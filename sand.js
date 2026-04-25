@@ -395,7 +395,13 @@ function updateCell(x, y) {
     if (ambientF > T_WOOD_BURN && rand() < Math.min(0.50, (ambientF - T_WOOD_BURN) / 19040)) {
       grid[i] = FIRE; meta[i] = (rand()*100+60)|0; colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
     }
-    // Grow slowly (upward preference)
+    // Falls straight down when unsupported
+    if (y < H - 1) {
+      const dn = idx(x, y + 1);
+      const bt = grid[dn];
+      if (bt === AIR || bt === SMOKE || bt === WATER) { swapCells(i, dn); return; }
+    }
+    // Grow slowly once settled (upward preference)
     if (rand() < 0.004) {
       const dx = randInt(3) - 1;
       const dy = rand() < 0.65 ? -1 : randInt(3) - 1;
