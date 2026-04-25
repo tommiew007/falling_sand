@@ -844,6 +844,13 @@ function updateCell(x, y) {
       const bt = grid[dn];
       if (bt === AIR || bt === SMOKE || bt === WATER) { swapCells(i, dn); return; }
     }
+    // Crushing gravity — wood splinters to sand under heavy columns
+    if (gravityStr >= 1.6 && !processed[i]) {
+      const pressure = pressureAbove(x, y);
+      if (pressure > 0 && rand() < (gravityStr - 1.6) * 0.007 + pressure * 0.001) {
+        grid[i] = SAND; colorVar[i] = (rand()*255)|0; processed[i] = 1; return;
+      }
+    }
     return;
   }
 }
