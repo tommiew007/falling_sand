@@ -31,10 +31,25 @@
       border-right: 1px solid #1e1e1e;
       display: flex;
       flex-direction: column;
+      justify-content: space-between;
       padding: 6px 4px;
       gap: 1px;
       flex-shrink: 0;
       overflow-y: auto;
+    }
+    #panel-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding-top: 6px;
+      border-top: 1px solid #1e1e1e;
+    }
+    #panel-actions button {
+      width: 100%;
+      font-size: 11px;
+      padding: 5px 4px;
+      letter-spacing: 0.5px;
+      text-align: center;
     }
 
     /* ── Viewport & canvas ───────────────────────────────────────────────── */
@@ -341,6 +356,12 @@
 <div id="main-area">
 <div id="left-panel">
   <div id="palette"></div>
+  <div id="panel-actions">
+    <button id="btnSave">save</button>
+    <button id="btnLoad">load</button>
+    <button id="btnClear">clear (C)</button>
+    <button id="btnPause">pause (P)</button>
+  </div>
 </div>
 
 <div id="viewport">
@@ -479,10 +500,6 @@
 
     <div class="sep"></div>
 
-    <button id="btnSave">save</button>
-    <button id="btnLoad">load</button>
-    <button id="btnClear">clear (C)</button>
-    <button id="btnPause">pause (P)</button>
     <span id="fps">fps: —</span>
   </div>
 </div>
