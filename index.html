@@ -305,6 +305,9 @@
     }
 
     #sTempSlider:disabled { opacity: 0.3; cursor: not-allowed; }
+    .panel-sep { height: 1px; background: #1e1e1e; margin: 2px 0; }
+    #btnMusic { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #btnMusic.on { background: #0a1a2a; color: #4af; border-color: #29f; }
     #btnInferno { background: #0d0d0d; color: #444; border-color: #222; letter-spacing: 1px; }
     #btnInferno.on { background: #aa0000; color: #fff; border-color: #ff2200; box-shadow: 0 0 8px rgba(255,30,0,0.55); }
 
@@ -357,6 +360,8 @@
 <div id="left-panel">
   <div id="palette"></div>
   <div id="panel-actions">
+    <button id="btnMusic">♫ music</button>
+    <div class="panel-sep"></div>
     <button id="btnSave">save</button>
     <button id="btnLoad">load</button>
     <button id="btnClear">clear (C)</button>

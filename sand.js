@@ -1398,6 +1398,39 @@ async function openLoad() {
 document.getElementById('btnSave').addEventListener('click', saveGrid);
 document.getElementById('btnLoad').addEventListener('click', openLoad);
 
+// ─── Music ────────────────────────────────────────────────────────────────────
+const TRACKS = [
+  { file: 'sound/509740__andrewkn__horizon.wav',                                              label: 'Horizon' },
+  { file: 'sound/531506__andrewkn__ambient-meditation-in-eternity.wav',                      label: 'Eternity' },
+  { file: 'sound/540908__kjartan_abel__altweibersommer-a-mellow-and-ambient-soundscape.wav', label: 'Altweibersommer' },
+  { file: 'sound/825435__andrewkn__ambient-pad-ionosphere.wav',                              label: 'Ionosphere' },
+];
+let musicIdx = -1;
+const musicAudio = new Audio();
+musicAudio.loop = true;
+musicAudio.volume = 0.5;
+
+function _musicUpdate() {
+  const btn = document.getElementById('btnMusic');
+  if (musicIdx === -1) {
+    btn.textContent = '♫ music';
+    btn.classList.remove('on');
+    musicAudio.pause();
+    musicAudio.src = '';
+  } else {
+    const t = TRACKS[musicIdx];
+    btn.textContent = '♫ ' + t.label;
+    btn.classList.add('on');
+    musicAudio.src = t.file;
+    musicAudio.play().catch(() => {});
+  }
+}
+
+document.getElementById('btnMusic').addEventListener('click', () => {
+  musicIdx = musicIdx >= TRACKS.length - 1 ? -1 : musicIdx + 1;
+  _musicUpdate();
+});
+
 // ─── Info card ────────────────────────────────────────────────────────────────
 const _ic      = document.getElementById('info-card');
 let   _icTimer = null;
