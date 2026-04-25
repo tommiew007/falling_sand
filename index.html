@@ -12,10 +12,29 @@
       overflow: hidden;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
       height: 100vh;
       font-family: 'Courier New', monospace;
+    }
+
+    /* ── Main area: left palette + canvas ───────────────────────────────── */
+    #main-area {
+      flex: 1;
+      display: flex;
+      flex-direction: row;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    /* ── Left palette panel ──────────────────────────────────────────────── */
+    #left-panel {
+      background: #111;
+      border-right: 1px solid #1e1e1e;
+      display: flex;
+      flex-direction: column;
+      padding: 6px 4px;
+      gap: 1px;
+      flex-shrink: 0;
+      overflow-y: auto;
     }
 
     /* ── Viewport & canvas ───────────────────────────────────────────────── */
@@ -25,7 +44,6 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 100%;
       overflow: hidden;
     }
 
@@ -133,69 +151,61 @@
       50% { opacity: 1; }
     }
 
-    /* ── Bottom bar ──────────────────────────────────────────────────────── */
-    #bar {
-      width: 100%;
-      background: #111;
-      border-top: 1px solid #1e1e1e;
-      padding: 5px 10px;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      flex-shrink: 0;
-    }
-
+    /* ── Palette buttons ─────────────────────────────────────────────────── */
     #palette {
       display: flex;
-      flex-direction: row;
-      align-items: center;
-      gap: 2px;
-      flex-shrink: 1;
-      min-width: 0;
+      flex-direction: column;
+      gap: 1px;
     }
 
     .mat-btn {
       display: flex;
-      flex-direction: column;
+      flex-direction: row;
       align-items: center;
-      gap: 1px;
+      gap: 6px;
       cursor: pointer;
-      padding: 3px 5px;
+      padding: 5px 8px;
       border-radius: 4px;
       border: 1px solid transparent;
       transition: border-color 0.1s;
       user-select: none;
+      white-space: nowrap;
+      width: 100%;
     }
 
     .mat-btn:hover { border-color: #444; }
     .mat-btn.selected { border-color: #aaa; background: #1e1e1e; }
 
     .swatch {
-      width: 16px;
-      height: 16px;
+      width: 14px;
+      height: 14px;
       border-radius: 2px;
       border: 1px solid rgba(255,255,255,0.15);
       flex-shrink: 0;
     }
 
-    .mat-btn .mat-key { color: #555; font-size: 8px; letter-spacing: 0; line-height: 1; }
-    .mat-btn.selected .mat-key { color: #999; }
-    .mat-btn small { display: none; }
+    .mat-btn .mat-name { color: #bbb; font-size: 12px; flex: 1; }
+    .mat-btn.selected .mat-name { color: #eee; }
+    .mat-btn .mat-key  { color: #3a3a3a; font-size: 10px; }
+    .mat-btn.selected .mat-key { color: #666; }
 
-    /* Selected material name shown separately */
-    #sel-name {
-      font-size: 11px;
-      color: #888;
-      white-space: nowrap;
-      padding: 0 4px;
-      min-width: 60px;
+    /* ── Bottom bar ──────────────────────────────────────────────────────── */
+    #bar {
+      width: 100%;
+      background: #111;
+      border-top: 1px solid #1e1e1e;
+      padding: 5px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      flex-shrink: 0;
     }
 
     .sep { width: 1px; height: 28px; background: #222; margin: 0 5px; flex-shrink: 0; }
 
-    /* ── Right controls ──────────────────────────────────────────────────── */
+    /* ── Controls ────────────────────────────────────────────────────────── */
     #right-controls {
-      margin-left: auto;
       display: flex;
       align-items: center;
       gap: 10px;
@@ -293,6 +303,11 @@
 </head>
 <body>
 
+<div id="main-area">
+<div id="left-panel">
+  <div id="palette"></div>
+</div>
+
 <div id="viewport">
   <canvas id="canvas"></canvas>
 
@@ -366,13 +381,9 @@
     </div>
   </div>
 </div>
+</div><!-- end #main-area -->
 
 <div id="bar">
-  <div id="palette"></div>
-  <span id="sel-name">Sand</span>
-
-  <div class="sep"></div>
-
   <div id="right-controls">
     <!-- Brush -->
     <div class="ctrl-group">
