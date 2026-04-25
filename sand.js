@@ -57,6 +57,49 @@ let paused = false;
 let ambientF   = 70;
 let useCelsius = false;
 
+// Piecewise linear curve: [sliderPct (0–100), tempF]
+// Key thresholds each get proportional slider travel so precision is
+// highest where it matters (low–mid temps).
+const TEMP_CURVE = [
+  [  0,     0],
+  [ 15,    32],   // freeze
+  [ 25,   212],   // boiling
+  [ 35,   480],   // combustion / wood ignition
+  [ 50,  1300],   // lava stays molten
+  [ 62,  2000],   // stone melts
+  [ 72,  3100],   // sand melts (silica)
+  [ 85,  6000],   // inferno
+  [100, 10000],   // plasma
+];
+
+function sliderToTemp(pct) {
+  for (let i = 1; i < TEMP_CURVE.length; i++) {
+    const [p0, t0] = TEMP_CURVE[i - 1];
+    const [p1, t1] = TEMP_CURVE[i];
+    if (pct <= p1) {
+      return Math.round(t0 + (pct - p0) / (p1 - p0) * (t1 - t0));
+    }
+  }
+  return 10000;
+}
+
+function tempToSlider(temp) {
+  for (let i = 1; i < TEMP_CURVE.length; i++) {
+    const [p0, t0] = TEMP_CURVE[i - 1];
+    const [p1, t1] = TEMP_CURVE[i];
+    if (temp <= t1) {
+      return p0 + (temp - t0) / (t1 - t0) * (p1 - p0);
+    }
+  }
+  return 100;
+}
+
+// Slider stores 0–1000 (= pct × 10) for fine integer resolution
+function syncSlider() {
+  document.getElementById('sTempSlider').value =
+    Math.round(tempToSlider(ambientF) * 10);
+}
+
 // Key thresholds (°F)
 const T_FREEZE     =   32;   // water ↔ ice
 const T_BOIL       =  212;   // water → steam
@@ -675,8 +718,32 @@ function updateTempDisplay() {
   descEl.style.color = col;
 }
 
-document.getElementById('sTempSlider').addEventListener('input', function () {
-  ambientF = parseInt(this.value);
+const sliderEl = document.getElementById('sTempSlider');
+
+// Dragging — piecewise non-linear mapping
+sliderEl.addEventListener('input', function () {
+  ambientF = sliderToTemp(parseInt(this.value) / 10);
+  updateTempDisplay();
+});
+
+// Scroll wheel over slider — fine-tune without moving the thumb far
+// Normal: ±5°F   Shift: ±1°F
+sliderEl.addEventListener('wheel', e => {
+  e.preventDefault();
+  const step = e.shiftKey ? 1 : 5;
+  ambientF = Math.max(0, Math.min(10000, ambientF + (e.deltaY < 0 ? step : -step)));
+  syncSlider();
+  updateTempDisplay();
+}, { passive: false });
+
+// Arrow keys when slider is focused — override browser default step
+sliderEl.addEventListener('keydown', e => {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  e.preventDefault();
+  const step  = e.shiftKey ? 10 : 1;
+  const delta = e.key === 'ArrowRight' ? step : -step;
+  ambientF = Math.max(0, Math.min(10000, ambientF + delta));
+  syncSlider();
   updateTempDisplay();
 });
 
@@ -746,4 +813,5 @@ function loop(now) {
 }
 
 updateTempDisplay();
+syncSlider();
 requestAnimationFrame(loop);

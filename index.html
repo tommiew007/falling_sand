@@ -223,23 +223,26 @@
     #tempVal  { font-size: 16px; font-weight: bold; color: #ccc; white-space: nowrap; min-width: 80px; text-align: right; transition: color 0.4s; }
     #tempDesc { font-size: 9px; color: #555; letter-spacing: 1px; transition: color 0.4s; }
 
-    /* gradient-backed range track */
+    /* gradient-backed range track — stops aligned to the piecewise curve breakpoints */
     #sTempSlider {
       -webkit-appearance: none;
       appearance: none;
-      width: 130px;
+      width: 160px;
       height: 5px;
       border-radius: 3px;
       cursor: pointer;
       outline: none;
       background: linear-gradient(to right,
-        #0055ff 0%,
-        #44aaff 3.2%,
-        #e0e0e0 7%,
-        #ffdd00 15%,
-        #ff7700 35%,
-        #ff2200 60%,
-        #ffffff 100%);
+        #0055ff  0%,    /* 0 °F   */
+        #44aaff  15%,   /* 32 °F  freeze   */
+        #e0e0e0  25%,   /* 212 °F boil     */
+        #ffdd00  35%,   /* 480 °F combust  */
+        #ff8800  50%,   /* 1300 °F lava    */
+        #ff3300  62%,   /* 2000 °F stone   */
+        #dd0000  72%,   /* 3100 °F sand    */
+        #aa0000  85%,   /* 6000 °F inferno */
+        #ffffff  100%   /* 10000 °F plasma */
+      );
     }
 
     #sTempSlider::-webkit-slider-thumb {
@@ -370,7 +373,7 @@
         <span id="tempVal">70°F</span>
         <span id="tempDesc">NORMAL</span>
       </div>
-      <input id="sTempSlider" type="range" min="0" max="10000" value="70">
+      <input id="sTempSlider" type="range" min="0" max="1000" value="170" title="Scroll to fine-tune ±5°F · Shift+scroll ±1°F">
       <button id="btnUnit">°C</button>
     </div>
 
