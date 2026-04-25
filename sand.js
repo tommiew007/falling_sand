@@ -457,6 +457,16 @@ function updateCell(x, y) {
   // ── Fire ──────────────────────────────────────────────────────────────────
   if (mat === FIRE) {
     if (y === 0) { grid[i] = AIR; processed[i] = 1; return; } // exit top of frame
+
+    // Suffocate — fire sealed by solid material on all 4 sides has no oxygen
+    const enclosed = [[-1,0],[1,0],[0,-1],[0,1]].every(([dx, dy]) => {
+      const nx = x + dx, ny = y + dy;
+      if (!inBounds(nx, ny)) return true;
+      const m = grid[idx(nx, ny)];
+      return m !== AIR && m !== SMOKE && m !== FIRE;
+    });
+    if (enclosed) { grid[i] = AIR; processed[i] = 1; return; }
+
     // Cold air kills fire faster; hot air makes it last longer
     const burnRate = ambientF < T_FREEZE ? 3 : ambientF < 100 ? 2 : 1;
     meta[i] -= burnRate;
