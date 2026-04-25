@@ -1126,13 +1126,11 @@ function showHelp() {
   helpDismissed = false;
 }
 
-// Clicking the overlay only dismisses it — does not start painting
+// Overlay blocks clicks to canvas while visible; links still work
 helpEl.addEventListener('mousedown', e => {
-  if (e.target.closest('a')) return; // let links open normally
+  if (e.target.closest('a')) return;
   e.preventDefault();
   e.stopPropagation();
-  dismissHelp();
-  if (paused) togglePause();
 });
 
 // ─── Keyboard ─────────────────────────────────────────────────────────────────
@@ -1147,10 +1145,18 @@ const KEY_MAP = {
 window.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveGrid(); return; }
   if ((e.ctrlKey || e.metaKey) && e.key === 'o') { e.preventDefault(); openLoad(); return; }
+  if (e.key === ' ') {
+    e.preventDefault();
+    if (!helpDismissed) { dismissHelp(); if (paused) togglePause(); } else togglePause();
+    return;
+  }
+  if (e.key === 'h' || e.key === 'H') {
+    if (helpDismissed) showHelp(); else { dismissHelp(); if (paused) togglePause(); }
+    return;
+  }
   if (e.key in KEY_MAP)               { dismissHelp(); selectedMat = KEY_MAP[e.key]; updatePaletteUI(); }
   if (e.key === 'c' || e.key === 'C') { dismissHelp(); clearGrid(); }
   if (e.key === 'p' || e.key === 'P') { dismissHelp(); togglePause(); }
-  if (e.key === 'h' || e.key === 'H') { showHelp(); }
   if (e.key === '[') { brushSize = Math.max(1,  brushSize - 1); updateBrushUI(); }
   if (e.key === ']') { brushSize = Math.min(20, brushSize + 1); updateBrushUI(); }
 });

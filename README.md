@@ -1,6 +1,6 @@
 # Falling Sand Simulation
 
-A browser-based particle physics sandbox with 15 interactive materials, wind, temperature, and explosive chain reactions — built with vanilla JavaScript and Canvas.
+A browser-based particle physics sandbox with 15 interactive materials, wind, temperature, gravity, and explosive chain reactions — built with vanilla JavaScript and Canvas.
 
 **Created by Tom Wellborn · 2026**
 
@@ -38,20 +38,29 @@ A browser-based particle physics sandbox with 15 interactive materials, wind, te
 |-------|--------|
 | **Click / drag** | Paint selected material |
 | **`[` / `]`** | Decrease / increase brush size |
+| **`Space` / `P`** | Pause / resume |
 | **`C`** | Clear the canvas |
-| **`P`** | Pause / resume |
+| **`H`** | Show / hide the help screen |
+| **`Ctrl+S`** | Save canvas to `.sand` file |
+| **`Ctrl+O`** | Load `.sand` file |
 
 Larger brush sizes paint coarser chunks for solid materials (sand, stone, wood, ice, plant, lava, gunpowder). Fluids and gases always paint at single-cell resolution.
+
+Hover any material on the canvas for a live **info card** showing its chemical formula, current state, active reactions, and science facts.
 
 ---
 
 ## Environment Controls (bottom bar)
 
-**Brush** — size 1–20. Solid materials scale from fine grains to large chunks.
+**Brush** — size 1–20.
 
 **Wind** — bidirectional slider (← calm →). Bends smoke strongly, fire moderately, and erodes resting sand piles. Heavier materials unaffected.
 
-**Temperature** — world thermostat from 0°F to 10,000°F. Controls the ambient environment, not the material you're holding. Lava always flows hot; ice is always cold when placed. The world temperature determines how fast they change.
+**Gravity** — 0 = weightless (nothing falls; wind is the only force), 5 = Earth normal, 10 = crushing. At extreme gravity, stone fractures to sand, ice melts to water, glass shatters, and wood splinters.
+
+**Speed** — ¼× · ½× · 1× · 2× · 4×. Scales simulation rate; rendering stays smooth.
+
+**Temperature** — world thermostat from 0°F to 5,000°F. Controls the ambient environment, not the material you're holding. Lava always flows hot; ice is always cold when placed. The world temperature determines how fast they change.
 
 | Threshold | Effect |
 |-----------|--------|
@@ -61,7 +70,7 @@ Larger brush sizes paint coarser chunks for solid materials (sand, stone, wood, 
 | Above 2,000°F | Stone melts back into lava |
 | Above 3,100°F | Sand melts into glass |
 | Above 5,000°F | Glass melts into lava |
-| Above 10,000°F | Plasma — most materials vaporise |
+| **INFERNO** | Instantly sets 10,000°F — most materials vaporise. Disables slider until toggled off. |
 
 Toggle **°F / °C** at any time. Scroll the temperature slider for fine ±5°F adjustment; Shift+scroll for ±1°F.
 
@@ -93,14 +102,14 @@ Toggle **°F / °C** at any time. Scroll the temperature slider for fine ±5°F 
 
 ## Things to Try
 
-- Pour water over oil and watch it sink beneath  
-- Drop lava into a water pool — stone and steam  
-- Build a gunpowder trail, light the far end with fire  
-- Fill a water channel, strike one end with electricity — arc travels the length  
-- Crank wind to max, then place fire and smoke  
-- Slide temperature to plasma and watch everything vaporise  
-- Enclose smoke in a wood box — it stays until you open a gap  
-- Stack gunpowder deep, detonate at the base — chain explosion cascades upward  
+- Pour water over oil and watch it sink beneath
+- Drop lava into a water pool — stone and steam
+- Build a gunpowder trail, light the far end with fire
+- Fill a water channel, strike one end with electricity — arc travels the length
+- Crank wind to max, then place fire and smoke
+- Hit INFERNO and watch everything vaporise
+- Enclose smoke in a wood box — it stays until you open a gap
+- Set gravity to 0, drop sand, then add wind — particles drift like dust in space
 
 ---
 
@@ -109,11 +118,12 @@ Toggle **°F / °C** at any time. Scroll the temperature slider for fine ±5°F 
 See [falling_sand.md](falling_sand.md) for full physics and rendering notes.
 
 **Grid:** 400×225 cells, scaled via CSS to fill the browser window.  
-**State:** Three typed arrays — `Uint8Array` for material IDs and color variation, `Uint16Array` for lifetimes/metadata.  
+**State:** Three typed arrays — `Uint8Array` for material IDs and color variation, `Uint16Array` for lifetimes/metadata, `Int8Array` for per-cell horizontal velocity.  
 **Render:** Direct `ImageData` pixel writes — no per-cell canvas draw calls.  
 **Step:** Bottom-to-top scan, alternating left/right each frame to eliminate directional bias.  
 **Explosions:** Queue-based chain processing, capped at 400 detonations per frame.  
-**Lightning:** Bolt queue capped at 30 active bolts; branches capped at 3 levels per bolt.
+**Lightning:** Bolt queue capped at 30 active bolts; branches capped at 3 levels per bolt.  
+**Save/Load:** Binary `.sand` format (magic header + grid + color variation arrays). Uses File System Access API where available so the browser remembers the last folder.
 
 ---
 
