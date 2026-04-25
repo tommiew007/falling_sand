@@ -34,7 +34,8 @@ const MAT_INFO = [
   { name: 'Acid',      color: '#39ff14', key: '9' },
   { name: 'Lava',      color: '#ff6600', key: 'Q' },
   { name: 'Ice',       color: '#a0dfff', key: 'W' },
-  { name: 'Gunpowder', color: '#28241e', key: 'E' },
+  { name: 'Gunpowder',   color: '#28241e', key: 'E' },
+  { name: 'Electricity', color: '#c8eeff', key: 'R' },
 ];
 
 // ─── Canvas setup ─────────────────────────────────────────────────────────────
@@ -211,6 +212,81 @@ function processExplosions() {
         }
       }
     }
+  }
+}
+
+// ─── Lightning bolt system ────────────────────────────────────────────────────
+const activeBolts = [];
+const BOLT_CAP    = 30;
+
+function spawnBolt(x, y) {
+  if (activeBolts.length >= BOLT_CAP) return;
+  const dirs = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+  const [dx, dy] = dirs[randInt(dirs.length)];
+  activeBolts.push({x, y, dx, dy, len: 0, maxLen: 12 + (rand() * 14)|0, branches: 0});
+}
+
+function processLightning() {
+  if (activeBolts.length === 0) return;
+  const toAdd = [];
+
+  for (let b = activeBolts.length - 1; b >= 0; b--) {
+    const bolt  = activeBolts[b];
+    const steps = 2 + ((rand() * 2)|0);
+    let alive   = true;
+
+    for (let s = 0; s < steps && alive; s++) {
+      // Zigzag jitter
+      if (rand() < 0.32) {
+        if (bolt.dx !== 0) bolt.dy = rand() < 0.5 ? 1 : -1;
+        else                bolt.dx = rand() < 0.5 ? 1 : -1;
+      }
+
+      const nx = bolt.x + bolt.dx, ny = bolt.y + bolt.dy;
+      if (!inBounds(nx, ny)) { alive = false; break; }
+
+      const ni  = idx(nx, ny);
+      const mat = grid[ni];
+      const conductive = mat === AIR || mat === WATER || mat === ACID ||
+                         mat === SMOKE || mat === ELECTRICITY;
+
+      if (!conductive) {
+        // React with whatever stopped the bolt
+        if (mat === OIL) {
+          grid[ni] = FIRE; meta[ni] = (rand()*80+40)|0; colorVar[ni] = (rand()*255)|0;
+        } else if ((mat === WOOD || mat === PLANT) && rand() < 0.4) {
+          grid[ni] = FIRE; meta[ni] = (rand()*120+60)|0; colorVar[ni] = (rand()*255)|0;
+        } else if (mat === GUNPOWDER) {
+          triggerExplosion(nx, ny);
+        } else if (mat === ICE && rand() < 0.3) {
+          grid[ni] = WATER; colorVar[ni] = (rand()*255)|0; meta[ni] = 0;
+        }
+        alive = false; break;
+      }
+
+      // Leave electricity trail
+      grid[ni] = ELECTRICITY; meta[ni] = 4 + ((rand()*4)|0); colorVar[ni] = (rand()*255)|0; processed[ni] = 1;
+      bolt.x = nx; bolt.y = ny; bolt.len++;
+
+      // Branch (perpendicular, capped)
+      if (rand() < 0.18 && bolt.branches < 3 && toAdd.length < 8) {
+        const branchMax = ((bolt.maxLen - bolt.len) * 0.6)|0;
+        if (branchMax > 3) {
+          const bdx = bolt.dy !== 0 ? (rand() < 0.5 ? 1 : -1) : bolt.dx;
+          const bdy = bolt.dx !== 0 ? (rand() < 0.5 ? 1 : -1) : bolt.dy;
+          toAdd.push({x: bolt.x, y: bolt.y, dx: bdx, dy: bdy, len: 0, maxLen: branchMax, branches: bolt.branches + 1});
+          bolt.branches++;
+        }
+      }
+
+      if (bolt.len >= bolt.maxLen) { alive = false; }
+    }
+
+    if (!alive) activeBolts.splice(b, 1);
+  }
+
+  for (const b of toAdd) {
+    if (activeBolts.length < BOLT_CAP) activeBolts.push(b);
   }
 }
 
@@ -614,6 +690,26 @@ function updateCell(x, y) {
     return;
   }
 
+  // ── Electricity ───────────────────────────────────────────────────────────
+  if (mat === ELECTRICITY) {
+    meta[i]--;
+    if (meta[i] <= 0) { grid[i] = AIR; processed[i] = 1; return; }
+    // Spread short-range through adjacent water and acid
+    for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+      const nx = x+dx, ny = y+dy;
+      if (!inBounds(nx,ny)) continue;
+      const ni = idx(nx,ny);
+      const nb = grid[ni];
+      if ((nb === WATER || nb === ACID) && rand() < 0.35) {
+        grid[ni] = ELECTRICITY; meta[ni] = 3+((rand()*3)|0); colorVar[ni] = (rand()*255)|0;
+      }
+      if (nb === OIL && rand() < 0.25)              { grid[ni] = FIRE; meta[ni] = (rand()*60+30)|0; colorVar[ni] = (rand()*255)|0; }
+      if ((nb === WOOD||nb===PLANT) && rand() < 0.1){ grid[ni] = FIRE; meta[ni] = (rand()*100+60)|0; colorVar[ni] = (rand()*255)|0; }
+      if (nb === GUNPOWDER)                          { triggerExplosion(nx,ny); }
+    }
+    return;
+  }
+
   // ── Gunpowder ─────────────────────────────────────────────────────────────
   if (mat === GUNPOWDER) {
     // Spontaneous ignition above wood-burn threshold
@@ -677,6 +773,7 @@ function step() {
     }
   }
   processExplosions();
+  processLightning();
   frame++;
 }
 
@@ -733,6 +830,13 @@ function render() {
       const fade = Math.max(0, Math.min(1, lf / 60));
       const v    = (70 * fade + (cv / 255 - 0.5) * 20) | 0;
       r = g = b = Math.max(0, v);
+    } else if (mat === ELECTRICITY) {
+      const intensity = 0.55 + (lf / 8) * 0.45;
+      const flicker   = Math.sin(t * 1.8 + cv * 0.25) * 0.2;
+      const v = clamp(intensity + flicker, 0.25, 1.0);
+      r = (160 + cv * 0.37 * v) | 0;
+      g = (210 * v)              | 0;
+      b = 255;
     } else {
       const bc = BASE[mat];
       const va = VAR[mat];
@@ -782,6 +886,13 @@ function toGrid(clientX, clientY) {
 const CHUNKY_MATS = new Set([SAND, STONE, WOOD, ICE, PLANT, LAVA, GUNPOWDER]);
 
 function paintAt(gx, gy) {
+  // Electricity spawns directional bolts rather than placing cells
+  if (selectedMat === ELECTRICITY) {
+    const count = 1 + ((rand() * 2)|0);
+    for (let b = 0; b < count; b++) spawnBolt(gx + randInt(3) - 1, gy + randInt(3) - 1);
+    return;
+  }
+
   const r   = brushSize;
   const r2  = r * r;
   // Water placed below freezing becomes ice
@@ -880,6 +991,7 @@ const KEY_MAP = {
   '0': AIR,  '1': SAND, '2': WATER, '3': FIRE,  '4': PLANT,
   '5': WOOD, '6': STONE,'7': OIL,   '8': SMOKE, '9': ACID,
   'q': LAVA, 'Q': LAVA, 'w': ICE,   'W': ICE,   'e': GUNPOWDER, 'E': GUNPOWDER,
+  'r': ELECTRICITY, 'R': ELECTRICITY,
 };
 
 window.addEventListener('keydown', e => {
@@ -982,7 +1094,7 @@ function togglePause() {
 }
 
 // Palette display order — alphabetical, Erase pinned first
-const PALETTE_ORDER = [AIR, ACID, FIRE, GUNPOWDER, ICE, LAVA, OIL, PLANT, SAND, SMOKE, STONE, WATER, WOOD];
+const PALETTE_ORDER = [AIR, ACID, ELECTRICITY, FIRE, GUNPOWDER, ICE, LAVA, OIL, PLANT, SAND, SMOKE, STONE, WATER, WOOD];
 
 const palette = document.getElementById('palette');
 PALETTE_ORDER.forEach(matId => {
