@@ -17,7 +17,8 @@ const SMOKE = 8;
 const ACID  = 9;
 const LAVA  = 10;
 const ICE       = 11;
-const GUNPOWDER = 12;
+const GUNPOWDER   = 12;
+const ELECTRICITY = 13;
 
 // ─── Material display ─────────────────────────────────────────────────────────
 const MAT_INFO = [
@@ -962,7 +963,7 @@ document.getElementById('btnUnit').addEventListener('click', () => {
 // ─── Palette UI ───────────────────────────────────────────────────────────────
 function updatePaletteUI() {
   document.querySelectorAll('.mat-btn').forEach((btn, i) => {
-    btn.classList.toggle('selected', i === selectedMat);
+    btn.classList.toggle('selected', PALETTE_ORDER[i] === selectedMat);
   });
 }
 
@@ -980,16 +981,20 @@ function togglePause() {
   document.getElementById('btnPause').textContent = paused ? 'resume (P)' : 'pause (P)';
 }
 
+// Palette display order — alphabetical, Erase pinned first
+const PALETTE_ORDER = [AIR, ACID, FIRE, GUNPOWDER, ICE, LAVA, OIL, PLANT, SAND, SMOKE, STONE, WATER, WOOD];
+
 const palette = document.getElementById('palette');
-MAT_INFO.forEach((m, i) => {
+PALETTE_ORDER.forEach(matId => {
+  const m   = MAT_INFO[matId];
   const btn = document.createElement('div');
-  btn.className = 'mat-btn' + (i === SAND ? ' selected' : '');
+  btn.className = 'mat-btn' + (matId === SAND ? ' selected' : '');
   btn.title = `${m.name}  [${m.key}]`;
   btn.innerHTML =
     `<div class="swatch" style="background:${m.color}"></div>` +
     `<span class="mat-name">${m.name}</span>` +
     `<span class="mat-key">${m.key}</span>`;
-  btn.addEventListener('click', () => { selectedMat = i; updatePaletteUI(); });
+  btn.addEventListener('click', () => { selectedMat = matId; updatePaletteUI(); });
   palette.appendChild(btn);
 });
 
