@@ -1266,6 +1266,7 @@ function clearGrid() {
 function togglePause() {
   paused = !paused;
   document.getElementById('btnPause').textContent = paused ? 'resume (P)' : 'pause (P)';
+  if (musicIdx !== -1) { if (paused) musicAudio.pause(); else musicAudio.play().catch(() => {}); }
 }
 
 // Palette display order — alphabetical, Erase pinned first
