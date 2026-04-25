@@ -58,6 +58,12 @@ const pixels  = imgData.data;
 let frame  = 0;
 let paused = false;
 
+// ─── Speed ────────────────────────────────────────────────────────────────────
+const SPEED_STEPS  = [0.25, 0.5, 1, 2, 4];
+const SPEED_LABELS = ['¼×', '½×', '1×', '2×', '4×'];
+let speedMult  = 1;
+let speedAccum = 0;
+
 // ─── Wind ─────────────────────────────────────────────────────────────────────
 // windX: -1 (full left) → 0 (calm) → +1 (full right)
 let windX = 0;
@@ -1237,6 +1243,13 @@ document.getElementById('sGrav').addEventListener('input', function () {
   gravityStr = parseInt(this.value) / 5;
   document.getElementById('vGrav').textContent = gravDesc(gravityStr);
 });
+document.getElementById('sSpeed').addEventListener('input', function () {
+  const idx = parseInt(this.value) - 1;
+  speedMult  = SPEED_STEPS[idx];
+  speedAccum = 0;
+  document.getElementById('vSpeed').textContent = SPEED_LABELS[idx];
+});
+
 document.getElementById('btnClear').addEventListener('click', clearGrid);
 document.getElementById('btnPause').addEventListener('click', togglePause);
 
@@ -1256,7 +1269,13 @@ function tickFPS(now) {
 // ─── Main loop ────────────────────────────────────────────────────────────────
 function loop(now) {
   tickFPS(now);
-  if (!paused) { step(); render(); }
+  if (!paused) {
+    speedAccum += speedMult;
+    const steps = Math.min(Math.floor(speedAccum), 8); // cap at 8 steps/frame
+    speedAccum -= steps;
+    for (let s = 0; s < steps; s++) step();
+    render(); // always render for smooth display even at sub-1× speeds
+  }
   requestAnimationFrame(loop);
 }
 
